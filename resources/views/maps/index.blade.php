@@ -113,11 +113,28 @@
         // Mengambil token dari env
         mapboxgl.accessToken = '{{ env('MAPBOX_TOKEN') }}';
 
+        // Data dari backend
+        const sellers = @json($sellers);
+        const buyers = @json($buyers);
+        const transactions = @json($transactions);
+
+        // Hitung total
+        const totalSellers = sellers.reduce((sum, item) => sum + (parseInt(item.jumlah_pendaftar_penjual) || 0), 0);
+        const totalBuyers = buyers.reduce((sum, item) => sum + (parseInt(item.jumlah_pendaftar_pembeli) || 0), 0);
+        const totalTransactions = transactions.reduce((sum, item) => sum + (parseInt(item.jumlah) || 0), 0);
+
+        // Set statistik ke elemen
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('total-sellers').textContent = totalSellers;
+            document.getElementById('total-buyers').textContent = totalBuyers;
+            document.getElementById('total-transactions').textContent = totalTransactions;
+        });
+
         // Inisialisasi map dengan lokasi pengguna
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(position => {
                 const { longitude, latitude } = position.coords;
-                
+
                 // Inisialisasi map
                 const map = new mapboxgl.Map({
                     container: 'map',
@@ -146,12 +163,117 @@
                 .setPopup(new mapboxgl.Popup().setHTML('<div class="p-2"><h3 class="font-bold">Lokasi Anda</h3></div>'))
                 .addTo(map);
 
-                // Set nilai awal statistik
-                document.getElementById('total-sellers').textContent = '0';
-                document.getElementById('total-buyers').textContent = '0';
-                document.getElementById('total-transactions').textContent = '0';
+                // ---
+                // Jika nanti ada data koordinat, tambahkan marker di sini
+                // Contoh:
+                // sellers.forEach(seller => {
+                //   if (seller.longitude && seller.latitude) {
+                //     new mapboxgl.Marker({color: '#2563eb'})
+                //       .setLngLat([seller.longitude, seller.latitude])
+                //       .setPopup(new mapboxgl.Popup().setHTML(`<div class='p-2'><b>Penjual</b><br>Kecamatan: ${seller.kecamatan}</div>`))
+                //       .addTo(map);
+                //   }
+                // });
+                // ---
             });
         }
+
+        // ...existing code...
+async function getCoordinatesFromName(name) {
+    const accessToken = mapboxgl.accessToken;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(name + ', Kabupaten Cilacap, Jawa Tengah, Indonesia')}.json?access_token=${accessToken}&limit=1`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.features && data.features.length > 0) {
+        return data.features[0].center; // [longitude, latitude]
+    }
+    return null;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    let map;
+    let markers = [];
+
+    function addMarkers(type) {
+        // Hapus marker lama
+        markers.forEach(m => m.remove());
+        markers = [];
+
+        if (type === 'all' || type === 'transaction') {
+            transactions.forEach(item => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const marker = new mapboxgl.Marker({ color: "#a21caf" })
+                        .setLngLat(item.coordinates)
+                        .setPopup(new mapboxgl.Popup().setHTML(
+                            `<div class='p-2'><b>Transaksi</b><br>Kecamatan: ${item.kecamatan}<br>Desa: ${item.desa ?? '-'}<br>Jenis: ${item.jenis}<br>Jumlah: ${item.jumlah}</div>`
+                        ))
+                        .addTo(map);
+                    markers.push(marker);
+                }
+            });
+        }
+        if (type === 'all' || type === 'seller') {
+            sellers.forEach(item => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const marker = new mapboxgl.Marker({ color: "#2563eb" })
+                        .setLngLat(item.coordinates)
+                        .setPopup(new mapboxgl.Popup().setHTML(
+                            `<div class='p-2'><b>Penjual</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_penjual ?? '-'}</div>`
+                        ))
+                        .addTo(map);
+                    markers.push(marker);
+                }
+            });
+        }
+        if (type === 'all' || type === 'buyer') {
+            buyers.forEach(item => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const marker = new mapboxgl.Marker({ color: "#22c55e" })
+                        .setLngLat(item.coordinates)
+                        .setPopup(new mapboxgl.Popup().setHTML(
+                            `<div class='p-2'><b>Pembeli</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_pembeli ?? '-'}</div>`
+                        ))
+                        .addTo(map);
+                    markers.push(marker);
+                }
+            });
+        }
+    }
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(position => {
+            const { longitude, latitude } = position.coords;
+
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [longitude, latitude],
+                zoom: 12
+            });
+
+            map.addControl(new mapboxgl.NavigationControl());
+            map.addControl(new mapboxgl.GeolocateControl({
+                positionOptions: { enableHighAccuracy: true },
+                trackUserLocation: true,
+                showUserHeading: true
+            }));
+
+            // Marker lokasi user
+            new mapboxgl.Marker({ color: "#FF0000" })
+                .setLngLat([longitude, latitude])
+                .setPopup(new mapboxgl.Popup().setHTML('<div class="p-2"><h3 class="font-bold">Lokasi Anda</h3></div>'))
+                .addTo(map);
+
+            // Tampilkan semua marker awal
+            addMarkers('all');
+
+            // Event filter
+            document.getElementById('filterType').addEventListener('change', function() {
+                addMarkers(this.value);
+            });
+        });
+    }
+});
     </script>
 </body>
 </html>
