@@ -74,12 +74,29 @@
                         <!-- Filter Section -->
                         <div class="bg-white rounded-lg shadow-lg p-4">
                             <h3 class="text-lg font-semibold text-gray-700 mb-3">Filter Data</h3>
-                            <select id="filterType" class="w-full p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500">
+                            <select id="filterType" class="w-full p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 mb-3">
                                 <option value="all">Semua Data</option>
                                 <option value="seller">Penjual</option>
                                 <option value="buyer">Pembeli</option>
                                 <option value="transaction">Transaksi</option>
                             </select>
+                            
+                            <!-- Filter by jenis penjualan -->
+                            <div class="mt-3">
+                                <label for="searchJenis" class="block text-sm font-medium text-gray-700 mb-1">Cari Jenis Penjualan:</label>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="searchJenis" placeholder="Contoh: Mie Ayam" 
+                                        class="w-full p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500">
+                                    <button id="searchButton" class="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <div class="text-xs text-gray-500">* Pencarian berdasarkan jenis penjualan/transaksi</div>
+                                    <button id="resetSearchButton" class="text-xs text-blue-600 hover:underline">Reset</button>
+                                </div>
+                                <div id="searchStatus" class="hidden mt-2 py-1 px-2 bg-blue-100 text-blue-800 text-sm rounded-md"></div>
+                            </div>
                         </div>
 
                         <!-- Stats Section -->
@@ -221,6 +238,9 @@ async function getCoordinatesFromName(name) {
 document.addEventListener('DOMContentLoaded', function() {
     let map;
     let markers = [];
+    let filteredTransactions = [...transactions]; // Salin array transactions
+    let searchKeyword = ''; // Kata kunci pencarian
+    
     // Source IDs untuk layer circles
     const sourceIds = {
         transactions: 'transactions-source',
@@ -228,6 +248,22 @@ document.addEventListener('DOMContentLoaded', function() {
         buyers: 'buyers-source'
     };
 
+    // Function untuk filter transaksi berdasarkan keyword
+    function filterTransactionsByKeyword(keyword) {
+        if (!keyword || keyword.trim() === '') {
+            // Jika keyword kosong, kembalikan semua transaksi
+            return [...transactions];
+        }
+        
+        keyword = keyword.toLowerCase().trim();
+        
+        // Filter transaksi yang jenis penjualannya mengandung keyword
+        return transactions.filter(item => {
+            if (!item.jenis) return false;
+            return item.jenis.toLowerCase().includes(keyword);
+        });
+    }
+    
     // Function untuk membuat GeoJSON data
     function createGeoJSONData(data, countField) {
         return {
@@ -354,10 +390,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Tambahkan count circles untuk setiap jenis data sesuai filter
         if (type === 'all' || type === 'transaction') {
-            transactions.forEach((item, index) => {
+            // Gunakan filteredTransactions yang bisa terfilter berdasarkan keyword
+            filteredTransactions.forEach((item, index) => {
                 if (item.coordinates && item.coordinates.length === 2) {
                     const count = parseInt(item.jumlah || 0);
-                    createCountCircle(item.coordinates, count, 'transaction', index);
+                    createCountCircle(item.coordinates, count, 'transaction', filteredTransactions.indexOf(item));
                 }
             });
         }
@@ -395,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Tambahkan source dan layer baru sesuai filter
         if (type === 'all' || type === 'transaction') {
-            const transactionsData = createGeoJSONData(transactions, 'jumlah');
+            const transactionsData = createGeoJSONData(filteredTransactions, 'jumlah');
             map.addSource(sourceIds.transactions, {
                 type: 'geojson',
                 data: transactionsData
@@ -570,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addCountCircles(type);
 
         if (type === 'all' || type === 'transaction') {
-            transactions.forEach(item => {
+            filteredTransactions.forEach(item => {
                 if (item.coordinates && item.coordinates.length === 2) {
                     const marker = new mapboxgl.Marker({ 
                         color: "#a21caf",
@@ -658,12 +695,101 @@ document.addEventListener('DOMContentLoaded', function() {
             // Optimasi ketika peta digeser
             let filterActive = 'all';
             
-            // Event filter
+            // Event filter by type (all, seller, buyer, transaction)
             document.getElementById('filterType').addEventListener('change', function() {
                 filterActive = this.value;
+                
+                // Auto reset pencarian jika filter bukan "all" atau "transaction"
+                if (filterActive !== 'all' && filterActive !== 'transaction') {
+                    document.getElementById('searchJenis').value = '';
+                    searchKeyword = '';
+                    filteredTransactions = [...transactions];
+                    document.getElementById('searchStatus').classList.add('hidden');
+                }
+                
                 addMarkers(filterActive);
             });
+            
+            // Event filter by keyword untuk jenis penjualan
+            const searchInput = document.getElementById('searchJenis');
+            const searchButton = document.getElementById('searchButton');
+            const resetSearchButton = document.getElementById('resetSearchButton');
+            
+            // Function untuk handle pencarian
+            function handleSearch() {
+                // Pastikan filter aktif sesuai untuk pencarian
+                if (filterActive !== 'all' && filterActive !== 'transaction') {
+                    // Otomatis ubah filter ke transaksi jika mencari jenis penjualan
+                    document.getElementById('filterType').value = 'transaction';
+                    filterActive = 'transaction';
+                }
+                
+                searchKeyword = searchInput.value;
+                
+                // Filter transaksi berdasarkan keyword
+                filteredTransactions = filterTransactionsByKeyword(searchKeyword);
+                
+                // Update status pencarian
+                updateSearchStatus();
+                
+                // Jika tidak ada hasil, tampilkan alert
+                if (filteredTransactions.length === 0 && searchKeyword.trim() !== '') {
+                    alert(`Tidak ditemukan jenis penjualan "${searchKeyword}"`);
+                    // Reset filter tapi tetap tampilkan keyword
+                    filteredTransactions = [...transactions];
+                }
+                
+                // Update tampilan map
+                addMarkers(filterActive);
+                
+                // Jika ada hasil pencarian, zoom ke hasil pencarian pertama
+                if (filteredTransactions.length > 0 && searchKeyword.trim() !== '') {
+                    const firstResult = filteredTransactions[0];
+                    if (firstResult.coordinates && firstResult.coordinates.length === 2) {
+                        map.flyTo({
+                            center: firstResult.coordinates,
+                            zoom: 14,
+                            essential: true
+                        });
+                    }
+                }
+            }
+            
+            // Event search button click
+            searchButton.addEventListener('click', handleSearch);
+            
+            // Event search input enter key
+            searchInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    handleSearch();
+                }
+            });
+            
+            // Event reset search button
+            resetSearchButton.addEventListener('click', resetSearch);
         });
+    }
+    
+    // Function untuk menampilkan status pencarian
+    function updateSearchStatus() {
+        const statusElement = document.getElementById('searchStatus');
+        if (!statusElement) return;
+        
+        if (searchKeyword && searchKeyword.trim() !== '') {
+            statusElement.textContent = `Pencarian: "${searchKeyword}" (${filteredTransactions.length} hasil)`;
+            statusElement.classList.remove('hidden');
+        } else {
+            statusElement.classList.add('hidden');
+        }
+    }
+    
+    // Function untuk reset pencarian
+    function resetSearch() {
+        document.getElementById('searchJenis').value = '';
+        searchKeyword = '';
+        filteredTransactions = [...transactions];
+        addMarkers(filterActive);
+        document.getElementById('searchStatus').classList.add('hidden');
     }
     
     // Function untuk menambahkan legend
