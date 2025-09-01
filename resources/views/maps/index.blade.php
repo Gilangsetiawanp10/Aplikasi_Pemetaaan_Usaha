@@ -16,6 +16,34 @@
         body {
             font-family: 'Poppins', sans-serif;
         }
+        .count-circle {
+            position: relative;
+        }
+        .count-circle::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: inherit;
+            z-index: -1;
+            opacity: 0.35;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.35;
+            }
+            70% {
+                transform: scale(1.4);
+                opacity: 0.2;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0.35;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -193,16 +221,361 @@ async function getCoordinatesFromName(name) {
 document.addEventListener('DOMContentLoaded', function() {
     let map;
     let markers = [];
+    // Source IDs untuk layer circles
+    const sourceIds = {
+        transactions: 'transactions-source',
+        sellers: 'sellers-source',
+        buyers: 'buyers-source'
+    };
+
+    // Function untuk membuat GeoJSON data
+    function createGeoJSONData(data, countField) {
+        return {
+            type: 'FeatureCollection',
+            features: data.filter(item => item.coordinates && item.coordinates.length === 2)
+                .map(item => ({
+                    type: 'Feature',
+                    properties: {
+                        count: parseInt(item[countField] || 0),
+                        ...item
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: item.coordinates
+                    }
+                }))
+        };
+    }
+
+    // Function untuk menambahkan count circles dengan nilai di dalamnya
+    function addCountCircles(type) {
+        // Hapus semua count circle yang ada
+        const existingCircles = document.querySelectorAll('.count-circle');
+        existingCircles.forEach(circle => circle.remove());
+        
+        // Warna untuk setiap jenis data
+        const colors = {
+            transaction: '#a21caf',  // ungu
+            seller: '#2563eb',       // biru
+            buyer: '#22c55e'         // hijau
+        };
+        
+        // Fungsi untuk membuat circle dengan angka di dalamnya
+        function createCountCircle(coordinates, count, type, index) {
+            // Buat elemen div untuk circle
+            const circle = document.createElement('div');
+            circle.className = 'count-circle absolute rounded-full flex items-center justify-center text-white font-bold shadow-md border-2 border-white';
+            
+            // Ukuran circle tetap sama untuk semua data
+            const size = 26; // Ukuran yang konsisten dan tidak terlalu besar
+            
+            // Set style
+            circle.style.width = `${size}px`;
+            circle.style.height = `${size}px`;
+            circle.style.backgroundColor = colors[type];
+            circle.style.fontSize = count > 999 ? '10px' : '11px'; // Font size yang lebih kecil untuk muat di circle
+            circle.style.zIndex = '10';
+            circle.style.cursor = 'pointer'; // Tambahkan cursor pointer
+            
+            // Set teks jumlah
+            circle.textContent = count > 999 ? `${Math.floor(count/1000)}k` : count;
+            
+            // Tambahkan atribut data untuk tipe dan koordinat asli
+            circle.dataset.type = type;
+            circle.dataset.index = index;
+            
+            // Siapkan popup content berdasarkan tipe data
+            let popupContent = '';
+            
+            if (type === 'transaction') {
+                const item = transactions[index];
+                popupContent = `
+                    <div class="p-3">
+                        <h3 class="font-bold text-purple-600 mb-2">Detail Transaksi</h3>
+                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
+                        <p><span class="font-semibold">Desa:</span> ${item.desa ?? '-'}</p>
+                        ${item.jenis ? `<p><span class="font-semibold">Jenis:</span> ${item.jenis}</p>` : ''}
+                        <p class="font-bold mt-2">Jumlah: ${count}</p>
+                    </div>
+                `;
+            } else if (type === 'seller') {
+                const item = sellers[index];
+                popupContent = `
+                    <div class="p-3">
+                        <h3 class="font-bold text-blue-600 mb-2">Detail Penjual</h3>
+                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
+                        <p class="font-bold mt-2">Jumlah Penjual: ${count}</p>
+                    </div>
+                `;
+            } else if (type === 'buyer') {
+                const item = buyers[index];
+                popupContent = `
+                    <div class="p-3">
+                        <h3 class="font-bold text-green-600 mb-2">Detail Pembeli</h3>
+                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
+                        <p class="font-bold mt-2">Jumlah Pembeli: ${count}</p>
+                    </div>
+                `;
+            }
+            
+            // Buat marker dengan elemen HTML custom
+            const marker = new mapboxgl.Marker({
+                element: circle,
+                anchor: 'center',
+                offset: getMarkerOffset(type)
+            })
+            .setLngLat(coordinates)
+            .setPopup(
+                new mapboxgl.Popup({
+                    closeButton: true,
+                    closeOnClick: true
+                })
+                .setHTML(popupContent)
+            )
+            .addTo(map);
+            
+            // Simpan marker untuk bisa dihapus nanti
+            markers.push(marker);
+        }
+        
+        // Fungsi untuk mendapatkan offset marker berdasarkan tipe
+        function getMarkerOffset(type) {
+            switch(type) {
+                case 'transaction':
+                    return [25, -25]; // [x, y] - kanan atas
+                case 'seller':
+                    return [-25, -25]; // kiri atas
+                case 'buyer':
+                    return [0, 35];  // bawah
+                default:
+                    return [0, 0];
+            }
+        }
+        
+        // Tambahkan count circles untuk setiap jenis data sesuai filter
+        if (type === 'all' || type === 'transaction') {
+            transactions.forEach((item, index) => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const count = parseInt(item.jumlah || 0);
+                    createCountCircle(item.coordinates, count, 'transaction', index);
+                }
+            });
+        }
+        
+        if (type === 'all' || type === 'seller') {
+            sellers.forEach((item, index) => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const count = parseInt(item.jumlah_pendaftar_penjual || 0);
+                    createCountCircle(item.coordinates, count, 'seller', index);
+                }
+            });
+        }
+        
+        if (type === 'all' || type === 'buyer') {
+            buyers.forEach((item, index) => {
+                if (item.coordinates && item.coordinates.length === 2) {
+                    const count = parseInt(item.jumlah_pendaftar_pembeli || 0);
+                    createCountCircle(item.coordinates, count, 'buyer', index);
+                }
+            });
+        }
+    }
+
+    // Function untuk menambahkan circle layers
+    function addCircleLayers(type) {
+        // Hapus semua source dan layer yang sudah ada
+        Object.values(sourceIds).forEach(id => {
+            if (map.getSource(id)) {
+                if (map.getLayer(`${id}-circles`)) {
+                    map.removeLayer(`${id}-circles`);
+                }
+                map.removeSource(id);
+            }
+        });
+
+        // Tambahkan source dan layer baru sesuai filter
+        if (type === 'all' || type === 'transaction') {
+            const transactionsData = createGeoJSONData(transactions, 'jumlah');
+            map.addSource(sourceIds.transactions, {
+                type: 'geojson',
+                data: transactionsData
+            });
+            
+            map.addLayer({
+                id: `${sourceIds.transactions}-circles`,
+                type: 'circle',
+                source: sourceIds.transactions,
+                paint: {
+                    'circle-radius': [
+                        'interpolate', ['linear'], ['get', 'count'],
+                        0, 5,
+                        10, 10,
+                        100, 20,
+                        1000, 30
+                    ],
+                    'circle-color': '#a21caf',
+                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
+                    'circle-stroke-width': 0,
+                    'circle-stroke-color': '#fff'
+                }
+            });
+        }
+        
+        if (type === 'all' || type === 'seller') {
+            const sellersData = createGeoJSONData(sellers, 'jumlah_pendaftar_penjual');
+            map.addSource(sourceIds.sellers, {
+                type: 'geojson',
+                data: sellersData
+            });
+            
+            map.addLayer({
+                id: `${sourceIds.sellers}-circles`,
+                type: 'circle',
+                source: sourceIds.sellers,
+                paint: {
+                    'circle-radius': [
+                        'interpolate', ['linear'], ['get', 'count'],
+                        0, 5,
+                        10, 10,
+                        100, 20,
+                        1000, 30
+                    ],
+                    'circle-color': '#2563eb',
+                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
+                    'circle-stroke-width': 0,
+                    'circle-stroke-color': '#fff'
+                }
+            });
+        }
+        
+        if (type === 'all' || type === 'buyer') {
+            const buyersData = createGeoJSONData(buyers, 'jumlah_pendaftar_pembeli');
+            map.addSource(sourceIds.buyers, {
+                type: 'geojson',
+                data: buyersData
+            });
+            
+            map.addLayer({
+                id: `${sourceIds.buyers}-circles`,
+                type: 'circle',
+                source: sourceIds.buyers,
+                paint: {
+                    'circle-radius': [
+                        'interpolate', ['linear'], ['get', 'count'],
+                        0, 5,
+                        10, 10,
+                        100, 20,
+                        1000, 30
+                    ],
+                    'circle-color': '#22c55e',
+                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
+                    'circle-stroke-width': 0,
+                    'circle-stroke-color': '#fff'
+                }
+            });
+        }
+        
+        // Tambahkan event popup untuk circle layers
+        setupCirclePopups();
+    }
+    
+    // Function untuk setup popup pada circle layers
+    function setupCirclePopups() {
+        const popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false
+        });
+        
+        // Untuk transaksi
+        if (map.getLayer(`${sourceIds.transactions}-circles`)) {
+            map.on('mouseenter', `${sourceIds.transactions}-circles`, (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+                const properties = e.features[0].properties;
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const html = `
+                    <div class='p-2'>
+                        <b>Transaksi</b><br>
+                        Kecamatan: ${properties.kecamatan}<br>
+                        Desa: ${properties.desa ?? '-'}<br>
+                        Jenis: ${properties.jenis}<br>
+                        Jumlah: ${properties.count}
+                    </div>
+                `;
+                
+                popup.setLngLat(coordinates).setHTML(html).addTo(map);
+            });
+            
+            map.on('mouseleave', `${sourceIds.transactions}-circles`, () => {
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        }
+        
+        // Untuk penjual
+        if (map.getLayer(`${sourceIds.sellers}-circles`)) {
+            map.on('mouseenter', `${sourceIds.sellers}-circles`, (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+                const properties = e.features[0].properties;
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const html = `
+                    <div class='p-2'>
+                        <b>Penjual</b><br>
+                        Kecamatan: ${properties.kecamatan}<br>
+                        Jumlah: ${properties.count}
+                    </div>
+                `;
+                
+                popup.setLngLat(coordinates).setHTML(html).addTo(map);
+            });
+            
+            map.on('mouseleave', `${sourceIds.sellers}-circles`, () => {
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        }
+        
+        // Untuk pembeli
+        if (map.getLayer(`${sourceIds.buyers}-circles`)) {
+            map.on('mouseenter', `${sourceIds.buyers}-circles`, (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+                const properties = e.features[0].properties;
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const html = `
+                    <div class='p-2'>
+                        <b>Pembeli</b><br>
+                        Kecamatan: ${properties.kecamatan}<br>
+                        Jumlah: ${properties.count}
+                    </div>
+                `;
+                
+                popup.setLngLat(coordinates).setHTML(html).addTo(map);
+            });
+            
+            map.on('mouseleave', `${sourceIds.buyers}-circles`, () => {
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        }
+    }
 
     function addMarkers(type) {
         // Hapus marker lama
         markers.forEach(m => m.remove());
         markers = [];
 
+        // Tambahkan circle layers untuk visualisasi jumlah data (hanya untuk popup)
+        addCircleLayers(type);
+        
+        // Tambahkan circle dengan jumlah di dalamnya
+        addCountCircles(type);
+
         if (type === 'all' || type === 'transaction') {
             transactions.forEach(item => {
                 if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ color: "#a21caf" })
+                    const marker = new mapboxgl.Marker({ 
+                        color: "#a21caf",
+                        scale: 0.8 // Marker sedikit lebih kecil
+                    })
                         .setLngLat(item.coordinates)
                         .setPopup(new mapboxgl.Popup().setHTML(
                             `<div class='p-2'><b>Transaksi</b><br>Kecamatan: ${item.kecamatan}<br>Desa: ${item.desa ?? '-'}<br>Jenis: ${item.jenis}<br>Jumlah: ${item.jumlah}</div>`
@@ -215,7 +588,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (type === 'all' || type === 'seller') {
             sellers.forEach(item => {
                 if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ color: "#2563eb" })
+                    const marker = new mapboxgl.Marker({ 
+                        color: "#2563eb",
+                        scale: 0.8 // Marker sedikit lebih kecil
+                    })
                         .setLngLat(item.coordinates)
                         .setPopup(new mapboxgl.Popup().setHTML(
                             `<div class='p-2'><b>Penjual</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_penjual ?? '-'}</div>`
@@ -228,7 +604,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (type === 'all' || type === 'buyer') {
             buyers.forEach(item => {
                 if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ color: "#22c55e" })
+                    const marker = new mapboxgl.Marker({ 
+                        color: "#22c55e",
+                        scale: 0.8 // Marker sedikit lebih kecil
+                    })
                         .setLngLat(item.coordinates)
                         .setPopup(new mapboxgl.Popup().setHTML(
                             `<div class='p-2'><b>Pembeli</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_pembeli ?? '-'}</div>`
@@ -248,7 +627,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 container: 'map',
                 style: 'mapbox://styles/mapbox/streets-v11',
                 center: [longitude, latitude],
-                zoom: 12
+                zoom: 12,
+                // Menambahkan opsi untuk performa lebih baik
+                fadeDuration: 0,
+                renderWorldCopies: false
             });
 
             map.addControl(new mapboxgl.NavigationControl());
@@ -264,14 +646,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 .setPopup(new mapboxgl.Popup().setHTML('<div class="p-2"><h3 class="font-bold">Lokasi Anda</h3></div>'))
                 .addTo(map);
 
-            // Tampilkan semua marker awal
-            addMarkers('all');
+            // Tunggu hingga map selesai dimuat baru tambahkan data
+            map.on('load', function() {
+                // Tampilkan semua marker awal
+                addMarkers('all');
+                
+                // Tambahkan legend untuk ukuran circle
+                addLegend();
+            });
 
+            // Optimasi ketika peta digeser
+            let filterActive = 'all';
+            
             // Event filter
             document.getElementById('filterType').addEventListener('change', function() {
-                addMarkers(this.value);
+                filterActive = this.value;
+                addMarkers(filterActive);
             });
         });
+    }
+    
+    // Function untuk menambahkan legend
+    function addLegend() {
+        const legend = document.createElement('div');
+        legend.className = 'bg-white p-2 rounded-lg shadow-lg absolute bottom-5 right-5';
+        legend.style.zIndex = '1';
+        legend.innerHTML = `
+            <h4 class="font-semibold text-sm mb-2">Keterangan Warna</h4>
+            <div class="flex items-center mb-1">
+                <div class="w-4 h-4 rounded-full bg-purple-600 mr-2"></div>
+                <span class="text-xs">Transaksi</span>
+            </div>
+            <div class="flex items-center mb-1">
+                <div class="w-4 h-4 rounded-full bg-blue-600 mr-2"></div>
+                <span class="text-xs">Penjual</span>
+            </div>
+            <div class="flex items-center">
+                <div class="w-4 h-4 rounded-full bg-green-600 mr-2"></div>
+                <span class="text-xs">Pembeli</span>
+            </div>
+        `;
+        document.getElementById('map').appendChild(legend);
     }
 });
     </script>
