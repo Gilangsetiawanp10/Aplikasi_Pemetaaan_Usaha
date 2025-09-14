@@ -44,6 +44,34 @@
                 opacity: 0.35;
             }
         }
+        
+        /* Legend Styles */
+        .legend-item {
+            transition: all 0.3s ease;
+        }
+        .legend-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .legend-color-dot {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Map Legend Responsive */
+        @media (max-width: 768px) {
+            #map-legend {
+                bottom: 10px !important;
+                right: 10px !important;
+                left: 10px !important;
+                max-width: none !important;
+            }
+        }
+        
+        /* Smooth transitions for legend toggle */
+        #legend-content {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -66,12 +94,22 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
                     <!-- Map Container (3/4 width) -->
                     <div class="md:col-span-3">
-                        <div id="map" class="w-full h-[800px] rounded-lg shadow-inner"></div>
+                        <div class="relative">
+                            <div id="map" class="w-full h-[800px] rounded-lg shadow-inner"></div>
+                            <!-- Loading overlay -->
+                            <div id="mapLoading" class="absolute inset-0 bg-gray-100 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
+                                <div class="text-center">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                    <p class="mt-2 text-gray-600 font-medium">Memuat peta...</p>
+                                    <p class="text-sm text-gray-500">Sedang memproses data...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Right Sidebar (1/4 width) -->
                     <div class="md:col-span-1 space-y-4">
-                        <!-- Filter Section -->
+                            <!-- Filter Section -->
                         <div class="bg-white rounded-lg shadow-lg p-4">
                             <h3 class="text-lg font-semibold text-gray-700 mb-3">Filter Data</h3>
                             <select id="filterType" class="w-full p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 mb-3">
@@ -80,6 +118,17 @@
                                 <option value="buyer">Pembeli</option>
                                 <option value="transaction">Transaksi</option>
                             </select>
+                            
+                            <!-- Info clustering -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                <h4 class="text-sm font-semibold text-blue-800 mb-1">💡 Info Tampilan</h4>
+                                <div class="text-xs text-blue-700 space-y-1">
+                                    <div>• <strong>Zoom Rendah:</strong> Data digabung dalam cluster</div>
+                                    <div>• <strong>Zoom Tinggi:</strong> Tampil detail individual</div>
+                                    <div>• <strong>Klik cluster:</strong> Zoom ke detail</div>
+                                    <div>• <strong>Data konsisten:</strong> Tidak ada yang hilang</div>
+                                </div>
+                            </div>
                             
                             <!-- Filter by jenis penjualan -->
                             <div class="mt-3">
@@ -101,6 +150,110 @@
 
                         <!-- Stats Section -->
                         <div class="space-y-4">
+                            <!-- Performance Info -->
+                            <div class="bg-white rounded-lg shadow-lg p-4">
+                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Status Tampilan</h3>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between">
+                                        <span>Zoom Level:</span>
+                                        <span id="zoom-level" class="font-mono font-semibold">12</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Data Tampil:</span>
+                                        <span id="visible-markers" class="font-mono font-semibold">0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Mode:</span>
+                                        <span id="render-mode" class="font-mono font-semibold">Clustered</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pt-1">
+                                        <span>Performa:</span>
+                                        <div class="flex items-center">
+                                            <div id="performance-indicator" class="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                                            <span id="performance-text" class="text-green-600 font-semibold">Optimal</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Legend Kategori Warna -->
+                            <div class="bg-white rounded-lg shadow-lg p-4">
+                                <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                                    <i class="fas fa-palette mr-2 text-blue-600"></i>
+                                    Kategori Data
+                                    <span class="ml-2 text-xs text-gray-500">(Klik untuk filter)</span>
+                                </h3>
+                                <div class="space-y-3">
+                                    <!-- Transaksi -->
+                                    <div class="legend-item flex items-center justify-between p-3 rounded-lg bg-purple-50 border border-purple-100 cursor-pointer hover:shadow-md transition-all duration-200" 
+                                         title="Klik untuk filter hanya data transaksi">
+                                        <div class="flex items-center">
+                                            <div class="legend-color-dot w-5 h-5 rounded-full bg-gradient-to-r from-purple-500 to-purple-700 mr-3 flex items-center justify-center">
+                                                <i class="fas fa-exchange-alt text-white text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-800">Transaksi</span>
+                                                <div class="text-xs text-purple-600">Volume perdagangan</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-xs">
+                                            <i class="fas fa-mouse-pointer text-purple-400 opacity-60"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Penjual -->
+                                    <div class="legend-item flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100 cursor-pointer hover:shadow-md transition-all duration-200"
+                                         title="Klik untuk filter hanya data penjual">
+                                        <div class="flex items-center">
+                                            <div class="legend-color-dot w-5 h-5 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 mr-3 flex items-center justify-center">
+                                                <i class="fas fa-store text-white text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-800">Penjual</span>
+                                                <div class="text-xs text-blue-600">Pendaftar penjual</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-xs">
+                                            <i class="fas fa-mouse-pointer text-blue-400 opacity-60"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Pembeli -->
+                                    <div class="legend-item flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-100 cursor-pointer hover:shadow-md transition-all duration-200"
+                                         title="Klik untuk filter hanya data pembeli">
+                                        <div class="flex items-center">
+                                            <div class="legend-color-dot w-5 h-5 rounded-full bg-gradient-to-r from-green-500 to-green-700 mr-3 flex items-center justify-center">
+                                                <i class="fas fa-shopping-cart text-white text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm font-medium text-gray-800">Pembeli</span>
+                                                <div class="text-xs text-green-600">Pendaftar pembeli</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-xs">
+                                            <i class="fas fa-mouse-pointer text-green-400 opacity-60"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 pt-3 border-t border-gray-200">
+                                    <div class="text-xs text-gray-500 space-y-1">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-info-circle mr-2 text-blue-500"></i>
+                                            <span>Ukuran lingkaran = jumlah data</span>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <i class="fas fa-search-plus mr-2 text-blue-500"></i>
+                                            <span>Zoom untuk melihat detail</span>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <i class="fas fa-filter mr-2 text-blue-500"></i>
+                                            <span>Klik kategori untuk filter data</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Total Penjual -->
                             <div class="bg-white rounded-lg shadow-lg p-4">
                                 <div class="flex items-center">
@@ -158,10 +311,15 @@
         // Mengambil token dari env
         mapboxgl.accessToken = '{{ env('MAPBOX_TOKEN') }}';
 
-        // Data dari backend
-        const sellers = @json($sellers);
-        const buyers = @json($buyers);
-        const transactions = @json($transactions);
+        // Data dari backend - Optimasi: hanya load data yang diperlukan
+        const rawSellers = @json($sellers);
+        const rawBuyers = @json($buyers);
+        const rawTransactions = @json($transactions);
+        
+        // Optimasi: Pre-process dan filter data yang valid
+        const sellers = rawSellers.filter(item => item.coordinates && item.coordinates.length === 2);
+        const buyers = rawBuyers.filter(item => item.coordinates && item.coordinates.length === 2);
+        const transactions = rawTransactions.filter(item => item.coordinates && item.coordinates.length === 2);
 
         // Hitung total
         const totalSellers = sellers.reduce((sum, item) => sum + (parseInt(item.jumlah_pendaftar_penjual) || 0), 0);
@@ -238,189 +396,266 @@ async function getCoordinatesFromName(name) {
 document.addEventListener('DOMContentLoaded', function() {
     let map;
     let markers = [];
-    let filteredTransactions = [...transactions]; // Salin array transactions
-    let searchKeyword = ''; // Kata kunci pencarian
+    let filteredTransactions = [...transactions];
+    let searchKeyword = '';
+    let currentZoom = 12;
+    let isLowZoom = true;
+    let visibleMarkerCount = 0;
+    
+    // Performance monitoring
+    const performanceMonitor = {
+        updateZoomLevel: (zoom) => {
+            document.getElementById('zoom-level').textContent = zoom.toFixed(1);
+        },
+        
+        updateVisibleMarkers: (count) => {
+            visibleMarkerCount = count;
+            document.getElementById('visible-markers').textContent = count;
+        },
+        
+        updateRenderMode: (mode) => {
+            document.getElementById('render-mode').textContent = mode;
+        },
+        
+        updatePerformanceStatus: (count) => {
+            const indicator = document.getElementById('performance-indicator');
+            const text = document.getElementById('performance-text');
+            
+            if (count < 100) {
+                indicator.className = 'w-2 h-2 rounded-full bg-green-500 mr-1';
+                text.textContent = 'Optimal';
+                text.className = 'text-green-600';
+            } else if (count < 300) {
+                indicator.className = 'w-2 h-2 rounded-full bg-yellow-500 mr-1';
+                text.textContent = 'Sedang';
+                text.className = 'text-yellow-600';
+            } else {
+                indicator.className = 'w-2 h-2 rounded-full bg-red-500 mr-1';
+                text.textContent = 'Berat';
+                text.className = 'text-red-600';
+            }
+        }
+    };
+    
+    // Optimasi: Clustering threshold berdasarkan zoom level - DIPERBAIKI
+    const ZOOM_SETTINGS = {
+        cluster: {
+            enabled: true,
+            maxZoom: 13,        // Clustering sampai zoom 13
+            radius: 50          // Radius clustering
+        },
+        visibility: {
+            minZoom: 8,         // Minimum zoom untuk mulai tampil
+            maxZoom: 18,        // Maximum zoom
+            fadeTransition: true // Smooth transition
+        }
+    };
+    
+    // Optimasi: Batasan jumlah marker yang ditampilkan - DISEDERHANAKAN
+    const MAX_MARKERS_PER_TYPE = 500; // Konsisten untuk semua zoom level
     
     // Source IDs untuk layer circles
     const sourceIds = {
         transactions: 'transactions-source',
         sellers: 'sellers-source',
-        buyers: 'buyers-source'
+        buyers: 'buyers-source',
+        clusteredTransactions: 'clustered-transactions-source',
+        clusteredSellers: 'clustered-sellers-source',
+        clusteredBuyers: 'clustered-buyers-source'
     };
 
+    // PERBAIKAN: Function untuk clustering yang konsisten
+    function smartClusterData(data, zoom) {
+        // Jika zoom tinggi (>13), tampilkan semua data tanpa clustering
+        if (zoom > ZOOM_SETTINGS.cluster.maxZoom) {
+            return data.map(item => ({
+                coordinates: item.coordinates,
+                items: [item],
+                count: parseInt(item.jumlah || item.jumlah_pendaftar_penjual || item.jumlah_pendaftar_pembeli || 0),
+                type: item.jenis ? 'transaction' : (item.jumlah_pendaftar_penjual ? 'seller' : 'buyer'),
+                clustered: false
+            }));
+        }
+        
+        // Untuk zoom rendah, gunakan clustering
+        const clusterDistance = zoom < 10 ? 0.02 : zoom < 12 ? 0.01 : 0.005;
+        const clusters = [];
+        const processed = new Set();
+        
+        data.forEach((item, index) => {
+            if (processed.has(index) || !item.coordinates) return;
+            
+            const cluster = {
+                coordinates: item.coordinates,
+                items: [item],
+                count: parseInt(item.jumlah || item.jumlah_pendaftar_penjual || item.jumlah_pendaftar_pembeli || 0),
+                type: item.jenis ? 'transaction' : (item.jumlah_pendaftar_penjual ? 'seller' : 'buyer'),
+                clustered: false
+            };
+            
+            // Cari data lain yang dekat untuk clustering
+            data.forEach((otherItem, otherIndex) => {
+                if (processed.has(otherIndex) || otherIndex === index || !otherItem.coordinates) return;
+                
+                const distance = getDistance(item.coordinates, otherItem.coordinates);
+                if (distance < clusterDistance) {
+                    cluster.items.push(otherItem);
+                    cluster.count += parseInt(otherItem.jumlah || otherItem.jumlah_pendaftar_penjual || otherItem.jumlah_pendaftar_pembeli || 0);
+                    processed.add(otherIndex);
+                    cluster.clustered = true;
+                }
+            });
+            
+            processed.add(index);
+            clusters.push(cluster);
+        });
+        
+        return clusters;
+    }
+    
+    // Function untuk menentukan apakah perlu update berdasarkan zoom
+    function shouldUpdateOnZoom(oldZoom, newZoom) {
+        const oldIsCluster = oldZoom <= ZOOM_SETTINGS.cluster.maxZoom;
+        const newIsCluster = newZoom <= ZOOM_SETTINGS.cluster.maxZoom;
+        
+        // Update jika status clustering berubah atau zoom berubah signifikan (>1 level)
+        return oldIsCluster !== newIsCluster || Math.abs(newZoom - oldZoom) > 1;
+    }
+    
+    // Utility: Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Function untuk menghitung jarak antara dua koordinat
+    function getDistance(coord1, coord2) {
+        const [lng1, lat1] = coord1;
+        const [lng2, lat2] = coord2;
+        return Math.sqrt(Math.pow(lng2 - lng1, 2) + Math.pow(lat2 - lat1, 2));
+    }
+    
+    // Function untuk menentukan zoom level category
+    function getZoomCategory(zoom) {
+        if (zoom <= ZOOM_SETTINGS.cluster.maxZoom) return 'clustered';
+        return 'individual';
+    }
+    
+    // Function untuk limit data berdasarkan zoom level - DIPERBAIKI
+    function limitDataByImportance(data, type) {
+        // Jangan limit data, tapi prioritaskan berdasarkan importance
+        if (data.length <= MAX_MARKERS_PER_TYPE) return data;
+        
+        // Prioritaskan data dengan count tertinggi
+        return data
+            .sort((a, b) => {
+                const countA = parseInt(a.jumlah || a.jumlah_pendaftar_penjual || a.jumlah_pendaftar_pembeli || 0);
+                const countB = parseInt(b.jumlah || b.jumlah_pendaftar_penjual || b.jumlah_pendaftar_pembeli || 0);
+                return countB - countA;
+            })
+            .slice(0, MAX_MARKERS_PER_TYPE);
+    }
+    
     // Function untuk filter transaksi berdasarkan keyword
     function filterTransactionsByKeyword(keyword) {
         if (!keyword || keyword.trim() === '') {
-            // Jika keyword kosong, kembalikan semua transaksi
             return [...transactions];
         }
         
         keyword = keyword.toLowerCase().trim();
-        
-        // Filter transaksi yang jenis penjualannya mengandung keyword
         return transactions.filter(item => {
             if (!item.jenis) return false;
             return item.jenis.toLowerCase().includes(keyword);
         });
     }
     
-    // Function untuk membuat GeoJSON data
-    function createGeoJSONData(data, countField) {
+    // PERBAIKAN: Function untuk membuat GeoJSON data yang konsisten
+    function createConsistentGeoJSONData(data, countField, zoom) {
+        // Limit data berdasarkan importance, bukan zoom
+        const limitedData = limitDataByImportance(data, countField);
+        
+        // Gunakan clustering hanya jika zoom <= 13
+        let processedData = limitedData;
+        if (zoom <= ZOOM_SETTINGS.cluster.maxZoom) {
+            const clusters = smartClusterData(limitedData, zoom);
+            processedData = clusters.map(cluster => ({
+                coordinates: cluster.coordinates,
+                [countField]: cluster.count,
+                clustered: cluster.clustered,
+                clusterSize: cluster.items.length,
+                originalData: cluster.items,
+                ...cluster.items[0] // Ambil properties dari item pertama
+            }));
+        }
+
         return {
             type: 'FeatureCollection',
-            features: data.filter(item => item.coordinates && item.coordinates.length === 2)
-                .map(item => ({
-                    type: 'Feature',
-                    properties: {
-                        count: parseInt(item[countField] || 0),
-                        ...item
-                    },
-                    geometry: {
-                        type: 'Point',
-                        coordinates: item.coordinates
-                    }
-                }))
+            features: processedData.map(item => ({
+                type: 'Feature',
+                properties: {
+                    count: parseInt(item[countField] || 0),
+                    clustered: item.clustered || false,
+                    clusterSize: item.clusterSize || 1,
+                    originalData: item.originalData || [item],
+                    ...item
+                },
+                geometry: {
+                    type: 'Point',
+                    coordinates: item.coordinates
+                }
+            }))
         };
     }
 
-    // Function untuk menambahkan count circles dengan nilai di dalamnya
-    function addCountCircles(type) {
-        // Hapus semua count circle yang ada
-        const existingCircles = document.querySelectorAll('.count-circle');
-        existingCircles.forEach(circle => circle.remove());
+    // PERBAIKAN: Function untuk menambahkan markers yang konsisten
+    function addConsistentMarkers(type) {
+        // Hapus marker lama
+        clearMarkers();
         
-        // Warna untuk setiap jenis data
-        const colors = {
-            transaction: '#a21caf',  // ungu
-            seller: '#2563eb',       // biru
-            buyer: '#22c55e'         // hijau
-        };
+        const currentZoomLevel = currentZoom;
+        let totalVisibleMarkers = 0;
         
-        // Fungsi untuk membuat circle dengan angka di dalamnya
-        function createCountCircle(coordinates, count, type, index) {
-            // Buat elemen div untuk circle
-            const circle = document.createElement('div');
-            circle.className = 'count-circle absolute rounded-full flex items-center justify-center text-white font-bold shadow-md border-2 border-white';
-            
-            // Ukuran circle tetap sama untuk semua data
-            const size = 26; // Ukuran yang konsisten dan tidak terlalu besar
-            
-            // Set style
-            circle.style.width = `${size}px`;
-            circle.style.height = `${size}px`;
-            circle.style.backgroundColor = colors[type];
-            circle.style.fontSize = count > 999 ? '10px' : '11px'; // Font size yang lebih kecil untuk muat di circle
-            circle.style.zIndex = '10';
-            circle.style.cursor = 'pointer'; // Tambahkan cursor pointer
-            
-            // Set teks jumlah
-            circle.textContent = count > 999 ? `${Math.floor(count/1000)}k` : count;
-            
-            // Tambahkan atribut data untuk tipe dan koordinat asli
-            circle.dataset.type = type;
-            circle.dataset.index = index;
-            
-            // Siapkan popup content berdasarkan tipe data
-            let popupContent = '';
-            
-            if (type === 'transaction') {
-                const item = transactions[index];
-                popupContent = `
-                    <div class="p-3">
-                        <h3 class="font-bold text-purple-600 mb-2">Detail Transaksi</h3>
-                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
-                        <p><span class="font-semibold">Desa:</span> ${item.desa ?? '-'}</p>
-                        ${item.jenis ? `<p><span class="font-semibold">Jenis:</span> ${item.jenis}</p>` : ''}
-                        <p class="font-bold mt-2">Jumlah: ${count}</p>
-                    </div>
-                `;
-            } else if (type === 'seller') {
-                const item = sellers[index];
-                popupContent = `
-                    <div class="p-3">
-                        <h3 class="font-bold text-blue-600 mb-2">Detail Penjual</h3>
-                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
-                        <p class="font-bold mt-2">Jumlah Penjual: ${count}</p>
-                    </div>
-                `;
-            } else if (type === 'buyer') {
-                const item = buyers[index];
-                popupContent = `
-                    <div class="p-3">
-                        <h3 class="font-bold text-green-600 mb-2">Detail Pembeli</h3>
-                        <p><span class="font-semibold">Kecamatan:</span> ${item.kecamatan}</p>
-                        <p class="font-bold mt-2">Jumlah Pembeli: ${count}</p>
-                    </div>
-                `;
-            }
-            
-            // Buat marker dengan elemen HTML custom
-            const marker = new mapboxgl.Marker({
-                element: circle,
-                anchor: 'center',
-                offset: getMarkerOffset(type)
-            })
-            .setLngLat(coordinates)
-            .setPopup(
-                new mapboxgl.Popup({
-                    closeButton: true,
-                    closeOnClick: true
-                })
-                .setHTML(popupContent)
-            )
-            .addTo(map);
-            
-            // Simpan marker untuk bisa dihapus nanti
-            markers.push(marker);
-        }
+        // Update performance monitor
+        performanceMonitor.updateZoomLevel(currentZoomLevel);
+        performanceMonitor.updateRenderMode(
+            currentZoomLevel <= ZOOM_SETTINGS.cluster.maxZoom ? 'Clustered' : 'Individual'
+        );
         
-        // Fungsi untuk mendapatkan offset marker berdasarkan tipe
-        function getMarkerOffset(type) {
-            switch(type) {
-                case 'transaction':
-                    return [25, -25]; // [x, y] - kanan atas
-                case 'seller':
-                    return [-25, -25]; // kiri atas
-                case 'buyer':
-                    return [0, 35];  // bawah
-                default:
-                    return [0, 0];
-            }
-        }
-        
-        // Tambahkan count circles untuk setiap jenis data sesuai filter
+        // Tambahkan data dengan clustering yang konsisten
         if (type === 'all' || type === 'transaction') {
-            // Gunakan filteredTransactions yang bisa terfilter berdasarkan keyword
-            filteredTransactions.forEach((item, index) => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const count = parseInt(item.jumlah || 0);
-                    createCountCircle(item.coordinates, count, 'transaction', filteredTransactions.indexOf(item));
-                }
-            });
+            const count = addConsistentCircleLayers('transaction', filteredTransactions, 'jumlah', currentZoomLevel);
+            totalVisibleMarkers += count;
         }
         
         if (type === 'all' || type === 'seller') {
-            sellers.forEach((item, index) => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const count = parseInt(item.jumlah_pendaftar_penjual || 0);
-                    createCountCircle(item.coordinates, count, 'seller', index);
-                }
-            });
+            const count = addConsistentCircleLayers('seller', sellers, 'jumlah_pendaftar_penjual', currentZoomLevel);
+            totalVisibleMarkers += count;
         }
         
         if (type === 'all' || type === 'buyer') {
-            buyers.forEach((item, index) => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const count = parseInt(item.jumlah_pendaftar_pembeli || 0);
-                    createCountCircle(item.coordinates, count, 'buyer', index);
-                }
-            });
+            const count = addConsistentCircleLayers('buyer', buyers, 'jumlah_pendaftar_pembeli', currentZoomLevel);
+            totalVisibleMarkers += count;
         }
+        
+        // Update performance monitoring
+        performanceMonitor.updateVisibleMarkers(totalVisibleMarkers);
+        performanceMonitor.updatePerformanceStatus(totalVisibleMarkers);
     }
-
-    // Function untuk menambahkan circle layers
-    function addCircleLayers(type) {
-        // Hapus semua source dan layer yang sudah ada
+    
+    // Optimasi: Function untuk clear semua markers dan layers
+    function clearMarkers() {
+        // Hapus markers
+        markers.forEach(m => m.remove());
+        markers = [];
+        
+        // Hapus layers
         Object.values(sourceIds).forEach(id => {
             if (map.getSource(id)) {
                 if (map.getLayer(`${id}-circles`)) {
@@ -429,231 +664,328 @@ document.addEventListener('DOMContentLoaded', function() {
                 map.removeSource(id);
             }
         });
-
-        // Tambahkan source dan layer baru sesuai filter
-        if (type === 'all' || type === 'transaction') {
-            const transactionsData = createGeoJSONData(filteredTransactions, 'jumlah');
-            map.addSource(sourceIds.transactions, {
-                type: 'geojson',
-                data: transactionsData
-            });
-            
-            map.addLayer({
-                id: `${sourceIds.transactions}-circles`,
-                type: 'circle',
-                source: sourceIds.transactions,
-                paint: {
-                    'circle-radius': [
-                        'interpolate', ['linear'], ['get', 'count'],
-                        0, 5,
-                        10, 10,
-                        100, 20,
-                        1000, 30
-                    ],
-                    'circle-color': '#a21caf',
-                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
-                    'circle-stroke-width': 0,
-                    'circle-stroke-color': '#fff'
-                }
-            });
-        }
         
-        if (type === 'all' || type === 'seller') {
-            const sellersData = createGeoJSONData(sellers, 'jumlah_pendaftar_penjual');
-            map.addSource(sourceIds.sellers, {
-                type: 'geojson',
-                data: sellersData
-            });
-            
-            map.addLayer({
-                id: `${sourceIds.sellers}-circles`,
-                type: 'circle',
-                source: sourceIds.sellers,
-                paint: {
-                    'circle-radius': [
-                        'interpolate', ['linear'], ['get', 'count'],
-                        0, 5,
-                        10, 10,
-                        100, 20,
-                        1000, 30
-                    ],
-                    'circle-color': '#2563eb',
-                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
-                    'circle-stroke-width': 0,
-                    'circle-stroke-color': '#fff'
-                }
-            });
-        }
-        
-        if (type === 'all' || type === 'buyer') {
-            const buyersData = createGeoJSONData(buyers, 'jumlah_pendaftar_pembeli');
-            map.addSource(sourceIds.buyers, {
-                type: 'geojson',
-                data: buyersData
-            });
-            
-            map.addLayer({
-                id: `${sourceIds.buyers}-circles`,
-                type: 'circle',
-                source: sourceIds.buyers,
-                paint: {
-                    'circle-radius': [
-                        'interpolate', ['linear'], ['get', 'count'],
-                        0, 5,
-                        10, 10,
-                        100, 20,
-                        1000, 30
-                    ],
-                    'circle-color': '#22c55e',
-                    'circle-opacity': 0,  // Transparansi 0 untuk menyembunyikan circle asli
-                    'circle-stroke-width': 0,
-                    'circle-stroke-color': '#fff'
-                }
-            });
-        }
-        
-        // Tambahkan event popup untuk circle layers
-        setupCirclePopups();
+        // Hapus count circles
+        const existingCircles = document.querySelectorAll('.count-circle');
+        existingCircles.forEach(circle => circle.remove());
     }
     
-    // Function untuk setup popup pada circle layers
-    function setupCirclePopups() {
-        const popup = new mapboxgl.Popup({
-            closeButton: false,
-            closeOnClick: false
+    // PERBAIKAN: Function untuk menambahkan circle layers yang konsisten
+    function addConsistentCircleLayers(dataType, data, countField, zoom) {
+        const sourceId = sourceIds[dataType === 'transaction' ? 'transactions' : dataType === 'seller' ? 'sellers' : 'buyers'];
+        
+        // Buat GeoJSON data yang konsisten
+        const geoJsonData = createConsistentGeoJSONData(data, countField, zoom);
+        
+        if (geoJsonData.features.length === 0) return 0;
+        
+        // Warna berdasarkan tipe
+        const colors = {
+            transaction: '#a21caf',
+            seller: '#2563eb', 
+            buyer: '#22c55e'
+        };
+        
+        // Tambahkan source dengan clustering otomatis Mapbox
+        map.addSource(sourceId, {
+            type: 'geojson',
+            data: geoJsonData,
+            cluster: zoom <= ZOOM_SETTINGS.cluster.maxZoom,
+            clusterMaxZoom: ZOOM_SETTINGS.cluster.maxZoom,
+            clusterRadius: ZOOM_SETTINGS.cluster.radius
         });
         
-        // Untuk transaksi
-        if (map.getLayer(`${sourceIds.transactions}-circles`)) {
-            map.on('mouseenter', `${sourceIds.transactions}-circles`, (e) => {
-                map.getCanvas().style.cursor = 'pointer';
-                const properties = e.features[0].properties;
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const html = `
-                    <div class='p-2'>
-                        <b>Transaksi</b><br>
-                        Kecamatan: ${properties.kecamatan}<br>
-                        Desa: ${properties.desa ?? '-'}<br>
-                        Jenis: ${properties.jenis}<br>
-                        Jumlah: ${properties.count}
-                    </div>
-                `;
-                
-                popup.setLngLat(coordinates).setHTML(html).addTo(map);
-            });
-            
-            map.on('mouseleave', `${sourceIds.transactions}-circles`, () => {
-                map.getCanvas().style.cursor = '';
-                popup.remove();
-            });
-        }
+        // Layer untuk clusters (akan otomatis muncul saat zoom rendah)
+        map.addLayer({
+            id: `${sourceId}-clusters`,
+            type: 'circle',
+            source: sourceId,
+            filter: ['has', 'point_count'],
+            paint: {
+                'circle-color': colors[dataType],
+                'circle-radius': [
+                    'step',
+                    ['get', 'point_count'],
+                    20, 5,    // radius 20 untuk cluster dengan <5 points
+                    25, 10,   // radius 25 untuk cluster dengan 5-10 points
+                    30, 20,   // radius 30 untuk cluster dengan 10-20 points
+                    35        // radius 35 untuk cluster dengan 20+ points
+                ],
+                'circle-opacity': 0.8,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff'
+            }
+        });
         
-        // Untuk penjual
-        if (map.getLayer(`${sourceIds.sellers}-circles`)) {
-            map.on('mouseenter', `${sourceIds.sellers}-circles`, (e) => {
-                map.getCanvas().style.cursor = 'pointer';
-                const properties = e.features[0].properties;
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const html = `
-                    <div class='p-2'>
-                        <b>Penjual</b><br>
-                        Kecamatan: ${properties.kecamatan}<br>
-                        Jumlah: ${properties.count}
-                    </div>
-                `;
-                
-                popup.setLngLat(coordinates).setHTML(html).addTo(map);
-            });
-            
-            map.on('mouseleave', `${sourceIds.sellers}-circles`, () => {
-                map.getCanvas().style.cursor = '';
-                popup.remove();
-            });
-        }
+        // Layer untuk cluster count labels
+        map.addLayer({
+            id: `${sourceId}-cluster-count`,
+            type: 'symbol',
+            source: sourceId,
+            filter: ['has', 'point_count'],
+            layout: {
+                'text-field': [
+                    'case',
+                    ['>=', ['get', 'point_count'], 1000],
+                    [
+                        'concat',
+                        ['round', ['/', ['get', 'point_count'], 1000]],
+                        'k'
+                    ],
+                    ['to-string', ['get', 'point_count']]
+                ],
+                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                'text-size': 12,
+                'text-anchor': 'center'
+            },
+            paint: {
+                'text-color': '#ffffff'
+            }
+        });
         
-        // Untuk pembeli
-        if (map.getLayer(`${sourceIds.buyers}-circles`)) {
-            map.on('mouseenter', `${sourceIds.buyers}-circles`, (e) => {
-                map.getCanvas().style.cursor = 'pointer';
-                const properties = e.features[0].properties;
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const html = `
-                    <div class='p-2'>
-                        <b>Pembeli</b><br>
-                        Kecamatan: ${properties.kecamatan}<br>
-                        Jumlah: ${properties.count}
-                    </div>
-                `;
-                
-                popup.setLngLat(coordinates).setHTML(html).addTo(map);
-            });
-            
-            map.on('mouseleave', `${sourceIds.buyers}-circles`, () => {
-                map.getCanvas().style.cursor = '';
-                popup.remove();
-            });
-        }
+        // Layer untuk individual points (akan muncul saat tidak di-cluster)
+        map.addLayer({
+            id: `${sourceId}-points`,
+            type: 'circle',
+            source: sourceId,
+            filter: ['!', ['has', 'point_count']],
+            paint: {
+                'circle-radius': [
+                    'interpolate', ['linear'], ['get', 'count'],
+                    0, 8,
+                    10, 12,
+                    50, 16,
+                    100, 20,
+                    500, 24,
+                    1000, 28
+                ],
+                'circle-color': colors[dataType],
+                'circle-opacity': 0.8,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff'
+            }
+        });
+        
+        // Layer untuk point labels (hanya tampil pada zoom tinggi)
+        map.addLayer({
+            id: `${sourceId}-point-labels`,
+            type: 'symbol',
+            source: sourceId,
+            filter: ['!', ['has', 'point_count']],
+            layout: {
+                'text-field': [
+                    'case',
+                    ['>=', ['get', 'count'], 1000],
+                    [
+                        'concat',
+                        ['round', ['/', ['get', 'count'], 1000]],
+                        'k'
+                    ],
+                    ['to-string', ['get', 'count']]
+                ],
+                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                'text-size': [
+                    'interpolate', ['linear'], ['zoom'],
+                    12, 0,    // Tidak tampil pada zoom < 12
+                    13, 10,   // Mulai tampil pada zoom 13
+                    18, 12    // Size maksimal pada zoom 18
+                ],
+                'text-anchor': 'center'
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-opacity': [
+                    'interpolate', ['linear'], ['zoom'],
+                    12, 0,    // Transparan pada zoom < 12
+                    13, 1     // Opaque pada zoom >= 13
+                ]
+            }
+        });
+        
+        // Setup event listeners untuk popup
+        setupConsistentPopups(sourceId, dataType);
+        
+        // Return jumlah features yang ditampilkan
+        return geoJsonData.features.length;
     }
 
-    function addMarkers(type) {
-        // Hapus marker lama
-        markers.forEach(m => m.remove());
-        markers = [];
-
-        // Tambahkan circle layers untuk visualisasi jumlah data (hanya untuk popup)
-        addCircleLayers(type);
+    // PERBAIKAN: Function untuk setup popup yang lebih informatif
+    function setupConsistentPopups(sourceId, dataType) {
+        const popup = new mapboxgl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            maxWidth: '300px'
+        });
         
-        // Tambahkan circle dengan jumlah di dalamnya
-        addCountCircles(type);
+        const colors = {
+            transaction: 'purple',
+            seller: 'blue', 
+            buyer: 'green'
+        };
+        
+        // Event untuk clusters
+        map.on('click', `${sourceId}-clusters`, (e) => {
+            const features = map.queryRenderedFeatures(e.point, {
+                layers: [`${sourceId}-clusters`]
+            });
+            
+            const clusterId = features[0].properties.cluster_id;
+            const pointCount = features[0].properties.point_count;
+            const coordinates = features[0].geometry.coordinates.slice();
+            
+            // Popup untuk cluster dengan opsi expand
+            const html = `
+                <div class='p-3'>
+                    <h3 class="font-bold text-${colors[dataType]}-600 mb-2">
+                        ${dataType.charAt(0).toUpperCase() + dataType.slice(1)} Cluster
+                    </h3>
+                    <p class="mb-2">
+                        <span class="font-semibold">Jumlah Lokasi:</span> ${pointCount}
+                    </p>
+                    <div class="flex space-x-2">
+                        <button onclick="expandCluster('${sourceId}', ${clusterId}, [${coordinates}])" 
+                                class="bg-${colors[dataType]}-600 text-white px-3 py-1 rounded text-sm hover:bg-${colors[dataType]}-700">
+                            Zoom ke Detail
+                        </button>
+                        <button onclick="showClusterDetails('${sourceId}', ${clusterId})" 
+                                class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700">
+                            Lihat List
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            popup.setLngLat(coordinates).setHTML(html).addTo(map);
+        });
+        
+        // Event untuk individual points
+        map.on('click', `${sourceId}-points`, (e) => {
+            const properties = e.features[0].properties;
+            const coordinates = e.features[0].geometry.coordinates.slice();
+            
+            let html = '';
+            if (dataType === 'transaction') {
+                html = `
+                    <div class='p-3'>
+                        <h3 class="font-bold text-purple-600 mb-2">Detail Transaksi</h3>
+                        <div class="space-y-1">
+                            <p><span class="font-semibold">Kecamatan:</span> ${properties.kecamatan}</p>
+                            ${properties.desa ? `<p><span class="font-semibold">Desa:</span> ${properties.desa}</p>` : ''}
+                            ${properties.jenis ? `<p><span class="font-semibold">Jenis:</span> ${properties.jenis}</p>` : ''}
+                            <p class="font-bold text-purple-600 mt-2">Jumlah: ${properties.count}</p>
+                        </div>
+                        ${properties.clustered ? `<p class="text-xs text-gray-500 mt-2">Cluster dari ${properties.clusterSize} lokasi</p>` : ''}
+                    </div>
+                `;
+            } else if (dataType === 'seller') {
+                html = `
+                    <div class='p-3'>
+                        <h3 class="font-bold text-blue-600 mb-2">Detail Penjual</h3>
+                        <div class="space-y-1">
+                            <p><span class="font-semibold">Kecamatan:</span> ${properties.kecamatan}</p>
+                            <p class="font-bold text-blue-600 mt-2">Jumlah Penjual: ${properties.count}</p>
+                        </div>
+                        ${properties.clustered ? `<p class="text-xs text-gray-500 mt-2">Cluster dari ${properties.clusterSize} lokasi</p>` : ''}
+                    </div>
+                `;
+            } else if (dataType === 'buyer') {
+                html = `
+                    <div class='p-3'>
+                        <h3 class="font-bold text-green-600 mb-2">Detail Pembeli</h3>
+                        <div class="space-y-1">
+                            <p><span class="font-semibold">Kecamatan:</span> ${properties.kecamatan}</p>
+                            <p class="font-bold text-green-600 mt-2">Jumlah Pembeli: ${properties.count}</p>
+                        </div>
+                        ${properties.clustered ? `<p class="text-xs text-gray-500 mt-2">Cluster dari ${properties.clusterSize} lokasi</p>` : ''}
+                    </div>
+                `;
+            }
+            
+            popup.setLngLat(coordinates).setHTML(html).addTo(map);
+        });
+        
+        // Hover effects untuk visual feedback
+        map.on('mouseenter', `${sourceId}-clusters`, () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        
+        map.on('mouseenter', `${sourceId}-points`, () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        
+        map.on('mouseleave', `${sourceId}-clusters`, () => {
+            map.getCanvas().style.cursor = '';
+        });
+        
+        map.on('mouseleave', `${sourceId}-points`, () => {
+            map.getCanvas().style.cursor = '';
+        });
+        
+        // Return jumlah features
+        return geoJsonData.features.length;
+    }
+    
+    // Helper function untuk expand cluster
+    window.expandCluster = function(sourceId, clusterId, coordinates) {
+        map.getSource(sourceId).getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err) return;
+            map.easeTo({
+                center: coordinates,
+                zoom: zoom + 1, // Zoom sedikit lebih dalam
+                duration: 1000
+            });
+        });
+    };
+    
+    // Helper function untuk show cluster details
+    window.showClusterDetails = function(sourceId, clusterId) {
+        map.getSource(sourceId).getClusterLeaves(clusterId, Infinity, 0, (err, features) => {
+            if (err) return;
+            
+            // Buat modal atau popup dengan list semua data dalam cluster
+            const detailsList = features.map(feature => {
+                const props = feature.properties;
+                if (props.jenis) {
+                    return `• ${props.kecamatan} - ${props.jenis} (${props.count})`;
+                } else {
+                    return `• ${props.kecamatan} (${props.count})`;
+                }
+            }).join('<br>');
+            
+            const detailPopup = new mapboxgl.Popup({
+                closeButton: true,
+                closeOnClick: true,
+                maxWidth: '400px'
+            });
+            
+            const html = `
+                <div class='p-3 max-h-64 overflow-y-auto'>
+                    <h3 class="font-bold mb-2">Detail Cluster (${features.length} lokasi)</h3>
+                    <div class="text-sm">${detailsList}</div>
+                </div>
+            `;
+            
+            detailPopup.setLngLat(features[0].geometry.coordinates).setHTML(html).addTo(map);
+        });
+    };
+    // PERBAIKAN: Handle zoom change yang lebih stabil
+    const handleZoomChange = debounce(() => {
+        const newZoom = map.getZoom();
+        const oldZoom = currentZoom;
+        
+        currentZoom = newZoom;
+        performanceMonitor.updateZoomLevel(newZoom);
+        
+        // Hanya update jika ada perubahan signifikan dalam clustering behavior
+        if (shouldUpdateOnZoom(oldZoom, newZoom)) {
+            const filterType = document.getElementById('filterType').value;
+            addConsistentMarkers(filterType);
+        }
+    }, 200); // Lebih responsif
 
-        if (type === 'all' || type === 'transaction') {
-            filteredTransactions.forEach(item => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ 
-                        color: "#a21caf",
-                        scale: 0.8 // Marker sedikit lebih kecil
-                    })
-                        .setLngLat(item.coordinates)
-                        .setPopup(new mapboxgl.Popup().setHTML(
-                            `<div class='p-2'><b>Transaksi</b><br>Kecamatan: ${item.kecamatan}<br>Desa: ${item.desa ?? '-'}<br>Jenis: ${item.jenis}<br>Jumlah: ${item.jumlah}</div>`
-                        ))
-                        .addTo(map);
-                    markers.push(marker);
-                }
-            });
-        }
-        if (type === 'all' || type === 'seller') {
-            sellers.forEach(item => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ 
-                        color: "#2563eb",
-                        scale: 0.8 // Marker sedikit lebih kecil
-                    })
-                        .setLngLat(item.coordinates)
-                        .setPopup(new mapboxgl.Popup().setHTML(
-                            `<div class='p-2'><b>Penjual</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_penjual ?? '-'}</div>`
-                        ))
-                        .addTo(map);
-                    markers.push(marker);
-                }
-            });
-        }
-        if (type === 'all' || type === 'buyer') {
-            buyers.forEach(item => {
-                if (item.coordinates && item.coordinates.length === 2) {
-                    const marker = new mapboxgl.Marker({ 
-                        color: "#22c55e",
-                        scale: 0.8 // Marker sedikit lebih kecil
-                    })
-                        .setLngLat(item.coordinates)
-                        .setPopup(new mapboxgl.Popup().setHTML(
-                            `<div class='p-2'><b>Pembeli</b><br>Kecamatan: ${item.kecamatan}<br>Jumlah: ${item.jumlah_pendaftar_pembeli ?? '-'}</div>`
-                        ))
-                        .addTo(map);
-                    markers.push(marker);
-                }
-            });
-        }
+    function addMarkers(type) {
+        // Panggil fungsi yang sudah diperbaiki
+        addConsistentMarkers(type);
     }
 
     if ("geolocation" in navigator) {
@@ -665,9 +997,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 style: 'mapbox://styles/mapbox/streets-v11',
                 center: [longitude, latitude],
                 zoom: 12,
-                // Menambahkan opsi untuk performa lebih baik
+                // Optimasi performa map
                 fadeDuration: 0,
-                renderWorldCopies: false
+                renderWorldCopies: false,
+                maxZoom: 18,
+                minZoom: 8,
+                // Optimasi: Reduce map complexity
+                antialias: false,
+                preserveDrawingBuffer: false
             });
 
             map.addControl(new mapboxgl.NavigationControl());
@@ -685,11 +1022,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Tunggu hingga map selesai dimuat baru tambahkan data
             map.on('load', function() {
-                // Tampilkan semua marker awal
-                addMarkers('all');
+                // Hide loading overlay
+                document.getElementById('mapLoading').style.display = 'none';
                 
-                // Tambahkan legend untuk ukuran circle
+                // Inisialisasi zoom level
+                currentZoom = map.getZoom();
+                
+                // Tampilkan marker awal
+                addConsistentMarkers('all');
+                
+                // Tambahkan legend
                 addLegend();
+                
+                // Inisialisasi sidebar legend selection
+                updateSidebarLegendSelection('all');
+                
+                // Optimasi: Event listener untuk zoom change
+                map.on('zoom', handleZoomChange);
+                
+                // Optimasi: Event listener untuk move end (ketika user berhenti pan/zoom)
+                map.on('moveend', debounce(() => {
+                    // Hanya update jika zoom berubah signifikan
+                    const newZoom = map.getZoom();
+                    if (Math.abs(newZoom - currentZoom) > 0.5) {
+                        const filterType = document.getElementById('filterType').value;
+                        addConsistentMarkers(filterType);
+                    }
+                }, 300));
             });
 
             // Optimasi ketika peta digeser
@@ -707,8 +1066,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('searchStatus').classList.add('hidden');
                 }
                 
-                addMarkers(filterActive);
+                addConsistentMarkers(filterActive);
+                updateSidebarLegendSelection(filterActive);
             });
+            
+            // Event listeners untuk legend items di sidebar
+            setupSidebarLegendListeners();
             
             // Event filter by keyword untuk jenis penjualan
             const searchInput = document.getElementById('searchJenis');
@@ -740,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // Update tampilan map
-                addMarkers(filterActive);
+                addConsistentMarkers(filterActive);
                 
                 // Jika ada hasil pencarian, zoom ke hasil pencarian pertama
                 if (filteredTransactions.length > 0 && searchKeyword.trim() !== '') {
@@ -783,36 +1146,284 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Function untuk setup event listeners legend di sidebar
+    function setupSidebarLegendListeners() {
+        // Get all legend items
+        const legendItems = document.querySelectorAll('.legend-item');
+        
+        legendItems.forEach((item, index) => {
+            let clickTimeout;
+            
+            item.addEventListener('click', function() {
+                // Clear any existing timeout for double-click detection
+                if (clickTimeout) {
+                    clearTimeout(clickTimeout);
+                    clickTimeout = null;
+                    // Double click - reset to show all
+                    document.getElementById('filterType').value = 'all';
+                    filterActive = 'all';
+                    addConsistentMarkers('all');
+                    updateSidebarLegendSelection('all');
+                    
+                    // Visual feedback for double-click
+                    this.style.transform = 'scale(1.05)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 200);
+                    
+                    return;
+                }
+                
+                // Single click - set timeout for double-click detection
+                clickTimeout = setTimeout(() => {
+                    let filterValue;
+                    
+                    // Determine filter value based on index
+                    switch(index) {
+                        case 0: // Transaksi (purple)
+                            filterValue = 'transaction';
+                            break;
+                        case 1: // Penjual (blue)
+                            filterValue = 'seller';
+                            break;
+                        case 2: // Pembeli (green)
+                            filterValue = 'buyer';
+                            break;
+                        default:
+                            filterValue = 'all';
+                    }
+                    
+                    // Update filter dropdown
+                    document.getElementById('filterType').value = filterValue;
+                    filterActive = filterValue;
+                    
+                    // Auto reset pencarian jika filter bukan "all" atau "transaction"
+                    if (filterActive !== 'all' && filterActive !== 'transaction') {
+                        document.getElementById('searchJenis').value = '';
+                        searchKeyword = '';
+                        filteredTransactions = [...transactions];
+                        document.getElementById('searchStatus').classList.add('hidden');
+                    }
+                    
+                    // Apply filter
+                    addConsistentMarkers(filterActive);
+                    
+                    // Update visual selection
+                    updateSidebarLegendSelection(filterActive);
+                    
+                    // Visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 150);
+                    
+                    clickTimeout = null;
+                }, 300); // 300ms delay for double-click detection
+            });
+            
+            // Hover effects
+            item.addEventListener('mouseenter', function() {
+                if (!clickTimeout) { // Only hover if not in middle of click detection
+                    this.style.transform = 'translateY(-2px)';
+                }
+            });
+            
+            item.addEventListener('mouseleave', function() {
+                if (!clickTimeout) { // Only reset hover if not in middle of click detection
+                    this.style.transform = '';
+                }
+            });
+        });
+        
+        // Add instruction for double-click  
+        const legendTitle = document.querySelector('h3:contains("Kategori Data")') || 
+                           Array.from(document.querySelectorAll('h3')).find(h3 => h3.textContent.includes('Kategori Data'));
+        if (legendTitle) {
+            const legendContainer = legendTitle.closest('div.bg-white');
+            if (legendContainer) {
+                const doubleClickHint = document.createElement('div');
+                doubleClickHint.className = 'mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600 text-center border';
+                doubleClickHint.innerHTML = '<i class="fas fa-mouse mr-1"></i> Double-click kategori untuk reset filter';
+                legendContainer.appendChild(doubleClickHint);
+            }
+        }
+    }
+    
+    // Function untuk update visual selection pada legend sidebar
+    function updateSidebarLegendSelection(activeFilter) {
+        const legendItems = document.querySelectorAll('.legend-item');
+        
+        legendItems.forEach((item, index) => {
+            // Remove all selection states
+            item.classList.remove('ring-2', 'ring-purple-400', 'ring-blue-400', 'ring-green-400');
+            item.classList.remove('bg-purple-100', 'bg-blue-100', 'bg-green-100');
+            
+            // Add back original backgrounds
+            switch(index) {
+                case 0: // Transaksi
+                    item.classList.add('bg-purple-50');
+                    if (activeFilter === 'transaction') {
+                        item.classList.add('ring-2', 'ring-purple-400', 'bg-purple-100');
+                    }
+                    break;
+                case 1: // Penjual
+                    item.classList.add('bg-blue-50');
+                    if (activeFilter === 'seller') {
+                        item.classList.add('ring-2', 'ring-blue-400', 'bg-blue-100');
+                    }
+                    break;
+                case 2: // Pembeli
+                    item.classList.add('bg-green-50');
+                    if (activeFilter === 'buyer') {
+                        item.classList.add('ring-2', 'ring-green-400', 'bg-green-100');
+                    }
+                    break;
+            }
+        });
+    }
+    
     // Function untuk reset pencarian
     function resetSearch() {
         document.getElementById('searchJenis').value = '';
         searchKeyword = '';
         filteredTransactions = [...transactions];
-        addMarkers(filterActive);
+        addConsistentMarkers(filterActive);
         document.getElementById('searchStatus').classList.add('hidden');
     }
     
     // Function untuk menambahkan legend
     function addLegend() {
         const legend = document.createElement('div');
-        legend.className = 'bg-white p-2 rounded-lg shadow-lg absolute bottom-5 right-5';
-        legend.style.zIndex = '1';
+        legend.id = 'map-legend';
+        legend.className = 'bg-white rounded-lg shadow-xl border border-gray-200 absolute bottom-5 right-5 max-w-xs';
+        legend.style.zIndex = '1000';
         legend.innerHTML = `
-            <h4 class="font-semibold text-sm mb-2">Keterangan Warna</h4>
-            <div class="flex items-center mb-1">
-                <div class="w-4 h-4 rounded-full bg-purple-600 mr-2"></div>
-                <span class="text-xs">Transaksi</span>
-            </div>
-            <div class="flex items-center mb-1">
-                <div class="w-4 h-4 rounded-full bg-blue-600 mr-2"></div>
-                <span class="text-xs">Penjual</span>
-            </div>
-            <div class="flex items-center">
-                <div class="w-4 h-4 rounded-full bg-green-600 mr-2"></div>
-                <span class="text-xs">Pembeli</span>
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-bold text-gray-800 text-sm flex items-center">
+                        <i class="fas fa-palette mr-2 text-blue-600"></i>
+                        Kategori Data
+                    </h4>
+                    <button id="toggle-legend" class="text-gray-400 hover:text-gray-600 text-xs">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                </div>
+                
+                <div id="legend-content" class="space-y-3">
+                    <!-- Transaksi -->
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-5 h-5 rounded-full bg-gradient-to-r from-purple-500 to-purple-700 mr-3 shadow-sm flex items-center justify-center">
+                                <i class="fas fa-exchange-alt text-white text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-800">Transaksi</span>
+                                <div class="text-xs text-gray-500">Volume perdagangan</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-purple-700" id="legend-transactions">0</div>
+                            <div class="text-xs text-gray-500">total</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Penjual -->
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-5 h-5 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 mr-3 shadow-sm flex items-center justify-center">
+                                <i class="fas fa-store text-white text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-800">Penjual</span>
+                                <div class="text-xs text-gray-500">Pendaftar penjual</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-blue-700" id="legend-sellers">0</div>
+                            <div class="text-xs text-gray-500">orang</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pembeli -->
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-green-50 hover:bg-green-100 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-5 h-5 rounded-full bg-gradient-to-r from-green-500 to-green-700 mr-3 shadow-sm flex items-center justify-center">
+                                <i class="fas fa-shopping-cart text-white text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-800">Pembeli</span>
+                                <div class="text-xs text-gray-500">Pendaftar pembeli</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-green-700" id="legend-buyers">0</div>
+                            <div class="text-xs text-gray-500">orang</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="my-3 border-gray-200">
+                
+                <div class="text-xs text-gray-500 space-y-1">
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle mr-2 text-blue-500"></i>
+                        <span>Zoom in untuk melihat detail</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-mouse-pointer mr-2 text-blue-500"></i>
+                        <span>Klik cluster untuk zoom otomatis</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-layer-group mr-2 text-blue-500"></i>
+                        <span>Data otomatis di-cluster pada zoom rendah</span>
+                    </div>
+                </div>
             </div>
         `;
+        
         document.getElementById('map').appendChild(legend);
+        
+        // Setup toggle functionality untuk legend
+        setupLegendToggle();
+        
+        // Update data di legend
+        updateLegendData();
+    }
+    
+    // Function untuk setup toggle legend
+    function setupLegendToggle() {
+        const toggleButton = document.getElementById('toggle-legend');
+        const legendContent = document.getElementById('legend-content');
+        let isCollapsed = false;
+        
+        toggleButton.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            
+            if (isCollapsed) {
+                legendContent.style.display = 'none';
+                toggleButton.innerHTML = '<i class="fas fa-chevron-down"></i>';
+                document.getElementById('map-legend').classList.add('cursor-pointer');
+            } else {
+                legendContent.style.display = 'block';
+                toggleButton.innerHTML = '<i class="fas fa-chevron-up"></i>';
+                document.getElementById('map-legend').classList.remove('cursor-pointer');
+            }
+        });
+        
+        // Klik pada legend header juga bisa toggle
+        document.getElementById('map-legend').addEventListener('click', (e) => {
+            if (isCollapsed && e.target.closest('#legend-content') === null) {
+                toggleButton.click();
+            }
+        });
+    }
+    
+    // Function untuk update data di legend
+    function updateLegendData() {
+        // Update dengan data yang sudah dihitung
+        document.getElementById('legend-transactions').textContent = totalTransactions;
+        document.getElementById('legend-sellers').textContent = totalSellers;
+        document.getElementById('legend-buyers').textContent = totalBuyers;
     }
 });
     </script>

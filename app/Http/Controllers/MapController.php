@@ -19,36 +19,85 @@ class MapController extends Controller
         $set_kota = 'Bandung';  // ganti sesuai kebutuhan
         $set_provinsi = 'Jawa Barat';  // ganti sesuai kebutuhan
 
-        // tambah kordinat setiap wilayah $transactions, $sellers, $buyers
+        // Optimasi: Batching geocoding dan caching
+        $geocodingCache = [];
+        
+        // Function helper untuk get coordinates dengan cache
+        $getCoordinatesWithCache = function($kecamatan, $desa = null) use ($geo, $set_kota, $set_provinsi, &$geocodingCache) {
+            $cacheKey = $kecamatan . '_' . ($desa ?? 'null');
+            
+            if (!isset($geocodingCache[$cacheKey])) {
+                $geocodingCache[$cacheKey] = $geo->getCoordinates(
+                    $kecamatan,
+                    $desa,
+                    $set_kota,
+                    $set_provinsi
+                );
+            }
+            
+            return $geocodingCache[$cacheKey];
+        };
+
+        // Optimasi: tambah koordinat dan filter data yang valid
         foreach ($transactions as $i => $transaction) {
-            // Simpan kordinat ke dalam transaksi
-            $transactions[$i]['coordinates'] = $geo->getCoordinates(
+            $coordinates = $getCoordinatesWithCache(
                 $transaction['kecamatan'],
-                $transaction['desa'] ?? null,
-                $set_kota,
-                $set_provinsi
+                $transaction['desa'] ?? null
             );
+            
+            // Hanya simpan jika koordinat valid dan jumlah > 0
+            if ($coordinates && (int)($transaction['jumlah'] ?? 0) > 0) {
+                $transactions[$i]['coordinates'] = $coordinates;
+            } else {
+                unset($transactions[$i]); // Hapus data yang tidak valid
+            }
         }
 
         foreach ($sellers as $i => $seller) {
-            // Simpan kordinat ke dalam seller
-            $sellers[$i]['coordinates'] = $geo->getCoordinates(
+            $coordinates = $getCoordinatesWithCache(
                 $seller['kecamatan'],
-                $seller['desa'] ?? null,
-                $set_kota,
-                $set_provinsi
+                $seller['desa'] ?? null
             );
+            
+            // Hanya simpan jika koordinat valid dan jumlah > 0
+            if ($coordinates && (int)($seller['jumlah_pendaftar_penjual'] ?? 0) > 0) {
+                $sellers[$i]['coordinates'] = $coordinates;
+            } else {
+                unset($sellers[$i]); // Hapus data yang tidak valid
+            }
         }
 
         foreach ($buyers as $i => $buyer) {
-            // Simpan kordinat ke dalam buyer
-            $buyers[$i]['coordinates'] = $geo->getCoordinates(
+            $coordinates = $getCoordinatesWithCache(
                 $buyer['kecamatan'],
-                $buyer['desa'] ?? null,
-                $set_kota,
-                $set_provinsi
+                $buyer['desa'] ?? null
             );
+            
+            // Hanya simpan jika koordinat valid dan jumlah > 0  
+            if ($coordinates && (int)($buyer['jumlah_pendaftar_pembeli'] ?? 0) > 0) {
+                $buyers[$i]['coordinates'] = $coordinates;
+            } else {
+                unset($buyers[$i]); // Hapus data yang tidak valid
+            }
         }
+
+        // Optimasi: Re-index array setelah unset
+        $transactions = array_values($transactions);
+        $sellers = array_values($sellers);
+        $buyers = array_values($buyers);
+
+        // Optimasi: Sort data berdasarkan jumlah (descending) untuk prioritas rendering
+        usort($transactions, function($a, $b) {
+            return (int)($b['jumlah'] ?? 0) - (int)($a['jumlah'] ?? 0);
+        });
+        
+        usort($sellers, function($a, $b) {
+            return (int)($b['jumlah_pendaftar_penjual'] ?? 0) - (int)($a['jumlah_pendaftar_penjual'] ?? 0);
+        });
+        
+        usort($buyers, function($a, $b) {
+            return (int)($b['jumlah_pendaftar_pembeli'] ?? 0) - (int)($a['jumlah_pendaftar_pembeli'] ?? 0);
+        });
 
         return view('maps.index', compact('transactions', 'sellers', 'buyers'));
     }
