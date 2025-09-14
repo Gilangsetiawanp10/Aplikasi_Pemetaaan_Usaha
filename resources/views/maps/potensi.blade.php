@@ -109,11 +109,45 @@
                             <!-- Location Info -->
                             <div id="locationInfo" class="mt-4 hidden">
                                 <div class="bg-blue-50 rounded-lg p-3">
-                                    <h4 class="font-semibold text-blue-800 mb-1">
+                                    <h4 class="font-semibold text-blue-800 mb-2">
                                         <i class="fas fa-map-marker-alt mr-1"></i>
-                                        Lokasi Anda
+                                        Detail Lokasi Anda
                                     </h4>
-                                    <p id="currentAddress" class="text-blue-700 text-sm"></p>
+                                    <div class="space-y-2 text-sm">
+                                        <div id="locationDetails" class="space-y-2">
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Latitude:</span>
+                                                <span id="currentLat" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Longitude:</span>
+                                                <span id="currentLng" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Kelurahan/Desa:</span>
+                                                <span id="currentVillage" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Kecamatan:</span>
+                                                <span id="currentDistrict" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Kota/Kabupaten:</span>
+                                                <span id="currentCity" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Provinsi:</span>
+                                                <span id="currentProvince" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-blue-600 font-medium">Kode Pos:</span>
+                                                <span id="currentPostalCode" class="text-blue-800 text-right">-</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-blue-200">
+                                            <p id="currentAddress" class="text-blue-700 text-xs italic"></p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -123,6 +157,60 @@
 
             <!-- Analysis Results -->
             <div id="analysisResults" class="mt-6 hidden">
+                <!-- Location-Based Analysis -->
+                <div class="mb-8">
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-white mb-2">
+                            <i class="fas fa-map-location-dot mr-2"></i>
+                            Analisis Berdasarkan Lokasi Anda
+                        </h2>
+                        <p class="text-indigo-100">
+                            Data bisnis di kecamatan dan desa Anda saat ini
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Sellers in Your District -->
+                        <div class="result-card">
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                    <i class="fas fa-store text-blue-500 mr-2"></i>
+                                    Penjual di Kecamatan Anda
+                                </h3>
+                                <div id="sellersInDistrict" class="space-y-3">
+                                    <!-- Sellers data will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buyers in Your District -->
+                        <div class="result-card">
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                    <i class="fas fa-users text-green-500 mr-2"></i>
+                                    Pembeli di Kecamatan Anda
+                                </h3>
+                                <div id="buyersInDistrict" class="space-y-3">
+                                    <!-- Buyers data will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transactions in Your Village -->
+                        <div class="result-card">
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                    <i class="fas fa-exchange-alt text-purple-500 mr-2"></i>
+                                    Transaksi di Desa Anda
+                                </h3>
+                                <div id="transactionsInVillage" class="space-y-3">
+                                    <!-- Transactions data will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Business Recommendations -->
                     <div class="result-card">
@@ -300,12 +388,14 @@
                 .addTo(map);
 
                 // Get address from coordinates
-                const address = await getAddressFromCoordinates(userLocation.lng, userLocation.lat);
-                document.getElementById('currentAddress').textContent = address;
+                const locationDetails = await getAddressFromCoordinates(userLocation.lng, userLocation.lat);
                 document.getElementById('locationInfo').classList.remove('hidden');
 
-                // Perform analysis
+                // Perform general business analysis
                 await performBusinessAnalysis(userLocation);
+
+                // Perform location-specific analysis
+                await performLocationSpecificAnalysis(locationDetails);
 
                 // Show results
                 document.getElementById('analysisResults').classList.remove('hidden');
@@ -339,16 +429,147 @@
         async function getAddressFromCoordinates(lng, lat) {
             try {
                 const response = await fetch(
-                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}&limit=1`
+                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}&limit=1&types=address,place,locality,neighborhood,district,region,postcode`
                 );
                 const data = await response.json();
                 
                 if (data.features && data.features.length > 0) {
-                    return data.features[0].place_name;
+                    const feature = data.features[0];
+                    const context = feature.context || [];
+                    
+                    // Extract location components
+                    const locationDetails = {
+                        address: feature.place_name,
+                        village: '',
+                        district: '',
+                        city: '',
+                        province: '',
+                        postalCode: ''
+                    };
+
+                    // Parse context for Indonesian administrative divisions
+                    context.forEach(item => {
+                        const itemText = item.text || '';
+                        
+                        if (item.id.includes('locality') || item.id.includes('neighborhood')) {
+                            locationDetails.village = itemText;
+                        } else if (item.id.includes('place')) {
+                            // For Indonesian locations, place usually contains district/city info
+                            if (itemText.toLowerCase().includes('kecamatan') || 
+                                (!locationDetails.district && !itemText.toLowerCase().includes('kota') && !itemText.toLowerCase().includes('kabupaten'))) {
+                                locationDetails.district = itemText;
+                            } else if (itemText.toLowerCase().includes('kota') || itemText.toLowerCase().includes('kabupaten') || !locationDetails.city) {
+                                locationDetails.city = itemText;
+                            }
+                        } else if (item.id.includes('district')) {
+                            locationDetails.district = itemText;
+                        } else if (item.id.includes('region')) {
+                            // Region could be province or city depending on level
+                            if (itemText.toLowerCase().includes('jawa') || itemText.toLowerCase().includes('sumatera') || 
+                                itemText.toLowerCase().includes('kalimantan') || itemText.toLowerCase().includes('sulawesi') ||
+                                itemText.toLowerCase().includes('bali') || itemText.toLowerCase().includes('nusa') ||
+                                itemText.toLowerCase().includes('maluku') || itemText.toLowerCase().includes('papua')) {
+                                locationDetails.province = itemText;
+                            } else if (itemText.toLowerCase().includes('kota') || itemText.toLowerCase().includes('kabupaten')) {
+                                locationDetails.city = itemText;
+                            } else if (!locationDetails.province) {
+                                locationDetails.province = itemText;
+                            }
+                        } else if (item.id.includes('postcode')) {
+                            locationDetails.postalCode = itemText;
+                        }
+                    });
+
+                    // If we can't get specific details, try to parse from place_name
+                    if (!locationDetails.district || !locationDetails.city) {
+                        const parts = feature.place_name.split(', ');
+                        if (parts.length >= 2) {
+                            // Try to identify city/regency from the address parts
+                            for (let i = 0; i < parts.length; i++) {
+                                const part = parts[i].trim();
+                                if (part.toLowerCase().includes('kota') || part.toLowerCase().includes('kabupaten')) {
+                                    locationDetails.city = part;
+                                } else if (part.toLowerCase().includes('jawa') && part.toLowerCase().includes('barat')) {
+                                    locationDetails.province = part;
+                                } else if (!locationDetails.district && i === 1) {
+                                    locationDetails.district = part;
+                                } else if (!locationDetails.village && i === 0) {
+                                    locationDetails.village = part;
+                                }
+                            }
+                            
+                            // Set defaults if still empty
+                            if (!locationDetails.city && parts.length >= 3) {
+                                locationDetails.city = parts[2];
+                            }
+                            if (!locationDetails.province && parts.length >= 4) {
+                                locationDetails.province = parts[3];
+                            }
+                        }
+                    }
+
+                    // Set defaults for Indonesian context if still empty
+                    if (!locationDetails.province) {
+                        locationDetails.province = 'Jawa Barat'; // Default assumption
+                    }
+                    if (!locationDetails.city && locationDetails.province === 'Jawa Barat') {
+                        locationDetails.city = 'Kota Bandung'; // Default assumption
+                    }
+
+                    // Update UI with location details
+                    document.getElementById('currentLat').textContent = lat.toFixed(6);
+                    document.getElementById('currentLng').textContent = lng.toFixed(6);
+                    document.getElementById('currentVillage').textContent = locationDetails.village || 'Tidak diketahui';
+                    document.getElementById('currentDistrict').textContent = locationDetails.district || 'Tidak diketahui';
+                    document.getElementById('currentCity').textContent = locationDetails.city || 'Tidak diketahui';
+                    document.getElementById('currentProvince').textContent = locationDetails.province || 'Tidak diketahui';
+                    document.getElementById('currentPostalCode').textContent = locationDetails.postalCode || 'Tidak diketahui';
+                    document.getElementById('currentAddress').textContent = locationDetails.address;
+
+                    return locationDetails;
                 }
-                return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                
+                // Fallback with better defaults
+                const fallback = {
+                    address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                    village: 'Tidak diketahui',
+                    district: 'Tidak diketahui',
+                    city: 'Kota Bandung',
+                    province: 'Jawa Barat',
+                    postalCode: 'Tidak diketahui'
+                };
+                
+                document.getElementById('currentLat').textContent = lat.toFixed(6);
+                document.getElementById('currentLng').textContent = lng.toFixed(6);
+                document.getElementById('currentVillage').textContent = fallback.village;
+                document.getElementById('currentDistrict').textContent = fallback.district;
+                document.getElementById('currentCity').textContent = fallback.city;
+                document.getElementById('currentProvince').textContent = fallback.province;
+                document.getElementById('currentPostalCode').textContent = fallback.postalCode;
+                document.getElementById('currentAddress').textContent = fallback.address;
+                
+                return fallback;
             } catch (error) {
-                return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                console.error('Error getting address:', error);
+                const errorDetails = {
+                    address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                    village: 'Tidak diketahui',
+                    district: 'Tidak diketahui', 
+                    city: 'Kota Bandung',
+                    province: 'Jawa Barat',
+                    postalCode: 'Tidak diketahui'
+                };
+                
+                document.getElementById('currentLat').textContent = lat.toFixed(6);
+                document.getElementById('currentLng').textContent = lng.toFixed(6);
+                document.getElementById('currentVillage').textContent = errorDetails.village;
+                document.getElementById('currentDistrict').textContent = errorDetails.district;
+                document.getElementById('currentCity').textContent = errorDetails.city;
+                document.getElementById('currentProvince').textContent = errorDetails.province;
+                document.getElementById('currentPostalCode').textContent = errorDetails.postalCode;
+                document.getElementById('currentAddress').textContent = errorDetails.address;
+                
+                return errorDetails;
             }
         }
 
@@ -514,6 +735,26 @@
             const totalSellers = nearbyData.sellers.reduce((sum, s) => sum + parseInt(s.jumlah_pendaftar_penjual || 0), 0);
             const totalBuyers = nearbyData.buyers.reduce((sum, b) => sum + parseInt(b.jumlah_pendaftar_pembeli || 0), 0);
 
+            // Check if there's any data to analyze
+            if (totalTransactions === 0 && totalSellers === 0 && totalBuyers === 0) {
+                analysis.innerHTML = `
+                    <div class="text-center p-6">
+                        <i class="fas fa-chart-bar text-gray-300 text-4xl mb-3"></i>
+                        <h4 class="font-semibold text-gray-600 mb-2">Tidak Ada Data Pasar</h4>
+                        <p class="text-gray-500 text-sm mb-4">
+                            Belum ada data transaksi, penjual, atau pembeli di area sekitar lokasi Anda (radius 5km)
+                        </p>
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <p class="text-xs text-blue-600">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                Ini bisa menjadi peluang untuk menjadi pionir di area yang belum terjamah!
+                            </p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
             const demandSupplyRatio = totalBuyers / (totalSellers || 1);
             
             let marketCondition = '';
@@ -643,7 +884,8 @@
 
             const locationAdvantagesList = [];
 
-            if (avgDistance < 2) {
+            // Only add advantages if there's actual data to support them
+            if (nearbyData.transactions.length > 0 && avgDistance < 2) {
                 locationAdvantagesList.push({
                     icon: 'fas fa-walking',
                     title: 'Aksesibilitas Tinggi',
@@ -667,19 +909,47 @@
                 });
             }
 
-            // Add some general advantages
-            locationAdvantagesList.push({
-                icon: 'fas fa-chart-line',
-                title: 'Data Historis Tersedia',
-                description: 'Lokasi memiliki data transaksi historis yang dapat digunakan untuk perencanaan bisnis.'
-            });
+            // Only add historical data advantage if there are actual transactions
+            if (nearbyData.transactions.length > 0) {
+                locationAdvantagesList.push({
+                    icon: 'fas fa-chart-line',
+                    title: 'Data Historis Tersedia',
+                    description: 'Lokasi memiliki data transaksi historis yang dapat digunakan untuk perencanaan bisnis.'
+                });
+            }
 
-            if (nearbyData.buyers.length > nearbyData.sellers.length) {
+            if (nearbyData.buyers.length > nearbyData.sellers.length && nearbyData.buyers.length > 0) {
                 locationAdvantagesList.push({
                     icon: 'fas fa-users',
                     title: 'Permintaan Tinggi',
                     description: 'Jumlah pembeli potensial lebih banyak dibanding penjual eksisting di area sekitar.'
                 });
+            }
+
+            // If no advantages found, show empty state
+            if (locationAdvantagesList.length === 0) {
+                advantages.innerHTML = `
+                    <div class="text-center p-6">
+                        <i class="fas fa-map-location text-gray-300 text-4xl mb-3"></i>
+                        <h4 class="font-semibold text-gray-600 mb-2">Belum Ada Data Keunggulan</h4>
+                        <p class="text-gray-500 text-sm mb-4">
+                            Tidak ditemukan data bisnis yang cukup untuk menganalisis keunggulan lokasi ini
+                        </p>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <h5 class="font-semibold text-green-800 mb-2">
+                                <i class="fas fa-seedling mr-1"></i>
+                                Potensi Tersembunyi:
+                            </h5>
+                            <ul class="text-xs text-green-700 space-y-1 text-left">
+                                <li>• Area virgin untuk bisnis baru</li>
+                                <li>• Tidak ada kompetisi yang signifikan</li>
+                                <li>• Peluang menjadi market leader</li>
+                                <li>• Potensi untuk menciptakan demand baru</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                return;
             }
 
             let html = '<div class="space-y-3">';
@@ -699,6 +969,302 @@
             html += '</div>';
 
             advantages.innerHTML = html;
+        }
+
+        async function performLocationSpecificAnalysis(locationDetails) {
+            // Analyze data based on user's specific location
+            analyzeSellersInDistrict(locationDetails.district);
+            analyzeBuyersInDistrict(locationDetails.district);
+            analyzeTransactionsInVillage(locationDetails.village);
+        }
+
+        function analyzeSellersInDistrict(userDistrict) {
+            const sellersContainer = document.getElementById('sellersInDistrict');
+            
+            if (!userDistrict || userDistrict === 'Tidak diketahui') {
+                sellersContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                        <p class="text-gray-500">Lokasi kecamatan tidak dapat dideteksi dengan akurat</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Find sellers in the same district
+            const sellersInSameDistrict = sellers.filter(seller => {
+                const sellerDistrict = seller.kecamatan?.toLowerCase().trim();
+                const targetDistrict = userDistrict.toLowerCase().trim();
+                return sellerDistrict && sellerDistrict.includes(targetDistrict);
+            });
+
+            if (sellersInSameDistrict.length === 0) {
+                sellersContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-search text-gray-400 text-2xl mb-2"></i>
+                        <p class="text-gray-500 mb-1">Belum ada data penjual terdaftar</p>
+                        <p class="text-sm text-gray-400">di Kecamatan ${userDistrict}</p>
+                        <div class="mt-3 p-2 bg-blue-50 rounded-lg">
+                            <p class="text-xs text-blue-600">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                Peluang untuk menjadi pioneer di area ini!
+                            </p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <h4 class="font-semibold text-blue-800 mb-1">
+                        <i class="fas fa-map-marker-alt mr-1"></i>
+                        Kecamatan ${userDistrict}
+                    </h4>
+                    <p class="text-sm text-blue-600">Ditemukan ${sellersInSameDistrict.length} data penjual</p>
+                </div>
+            `;
+
+            sellersInSameDistrict.forEach(seller => {
+                const sellerCount = parseInt(seller.jumlah_pendaftar_penjual || 0);
+                html += `
+                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-800">${seller.kecamatan}</p>
+                            <p class="text-sm text-gray-600">
+                                <i class="fas fa-store mr-1"></i>
+                                ${sellerCount} penjual terdaftar
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span class="font-bold text-blue-600">${sellerCount}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const totalSellersInDistrict = sellersInSameDistrict.reduce((sum, seller) => 
+                sum + parseInt(seller.jumlah_pendaftar_penjual || 0), 0
+            );
+
+            html += `
+                <div class="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-semibold text-blue-800">Total Penjual</p>
+                            <p class="text-sm text-blue-600">di kecamatan Anda</p>
+                        </div>
+                        <div class="text-2xl font-bold text-blue-700">${totalSellersInDistrict}</div>
+                    </div>
+                </div>
+            `;
+
+            sellersContainer.innerHTML = html;
+        }
+
+        function analyzeBuyersInDistrict(userDistrict) {
+            const buyersContainer = document.getElementById('buyersInDistrict');
+            
+            if (!userDistrict || userDistrict === 'Tidak diketahui') {
+                buyersContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                        <p class="text-gray-500">Lokasi kecamatan tidak dapat dideteksi dengan akurat</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Find buyers in the same district
+            const buyersInSameDistrict = buyers.filter(buyer => {
+                const buyerDistrict = buyer.kecamatan?.toLowerCase().trim();
+                const targetDistrict = userDistrict.toLowerCase().trim();
+                return buyerDistrict && buyerDistrict.includes(targetDistrict);
+            });
+
+            if (buyersInSameDistrict.length === 0) {
+                buyersContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-search text-gray-400 text-2xl mb-2"></i>
+                        <p class="text-gray-500 mb-1">Belum ada data pembeli terdaftar</p>
+                        <p class="text-sm text-gray-400">di Kecamatan ${userDistrict}</p>
+                        <div class="mt-3 p-2 bg-green-50 rounded-lg">
+                            <p class="text-xs text-green-600">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                Potensi untuk mengembangkan basis pelanggan baru!
+                            </p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="mb-4 p-3 bg-green-50 rounded-lg">
+                    <h4 class="font-semibold text-green-800 mb-1">
+                        <i class="fas fa-map-marker-alt mr-1"></i>
+                        Kecamatan ${userDistrict}
+                    </h4>
+                    <p class="text-sm text-green-600">Ditemukan ${buyersInSameDistrict.length} data pembeli</p>
+                </div>
+            `;
+
+            buyersInSameDistrict.forEach(buyer => {
+                const buyerCount = parseInt(buyer.jumlah_pendaftar_pembeli || 0);
+                html += `
+                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-800">${buyer.kecamatan}</p>
+                            <p class="text-sm text-gray-600">
+                                <i class="fas fa-users mr-1"></i>
+                                ${buyerCount} pembeli terdaftar
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                                <span class="font-bold text-green-600">${buyerCount}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const totalBuyersInDistrict = buyersInSameDistrict.reduce((sum, buyer) => 
+                sum + parseInt(buyer.jumlah_pendaftar_pembeli || 0), 0
+            );
+
+            html += `
+                <div class="mt-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-l-4 border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-semibold text-green-800">Total Pembeli</p>
+                            <p class="text-sm text-green-600">di kecamatan Anda</p>
+                        </div>
+                        <div class="text-2xl font-bold text-green-700">${totalBuyersInDistrict}</div>
+                    </div>
+                </div>
+            `;
+
+            buyersContainer.innerHTML = html;
+        }
+
+        function analyzeTransactionsInVillage(userVillage) {
+            const transactionsContainer = document.getElementById('transactionsInVillage');
+            
+            if (!userVillage || userVillage === 'Tidak diketahui') {
+                transactionsContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                        <p class="text-gray-500">Lokasi desa/kelurahan tidak dapat dideteksi dengan akurat</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Find transactions in the same village
+            const transactionsInSameVillage = transactions.filter(transaction => {
+                const transactionVillage = transaction.desa?.toLowerCase().trim();
+                const targetVillage = userVillage.toLowerCase().trim();
+                return transactionVillage && transactionVillage.includes(targetVillage);
+            });
+
+            if (transactionsInSameVillage.length === 0) {
+                transactionsContainer.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-search text-gray-400 text-2xl mb-2"></i>
+                        <p class="text-gray-500 mb-1">Belum ada data transaksi</p>
+                        <p class="text-sm text-gray-400">di Desa/Kelurahan ${userVillage}</p>
+                        <div class="mt-3 p-2 bg-purple-50 rounded-lg">
+                            <p class="text-xs text-purple-600">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                Kesempatan untuk menjadi yang pertama di area ini!
+                            </p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by transaction count (highest first)
+            const sortedTransactions = transactionsInSameVillage
+                .map(transaction => ({
+                    ...transaction,
+                    jumlahInt: parseInt(transaction.jumlah || 0)
+                }))
+                .sort((a, b) => b.jumlahInt - a.jumlahInt);
+
+            let html = `
+                <div class="mb-4 p-3 bg-purple-50 rounded-lg">
+                    <h4 class="font-semibold text-purple-800 mb-1">
+                        <i class="fas fa-map-marker-alt mr-1"></i>
+                        Desa/Kelurahan ${userVillage}
+                    </h4>
+                    <p class="text-sm text-purple-600">Ditemukan ${sortedTransactions.length} jenis transaksi</p>
+                </div>
+            `;
+
+            sortedTransactions.forEach((transaction, index) => {
+                const isTop = index < 3;
+                const badgeColor = isTop ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600';
+                const rankIcon = index === 0 ? 'fas fa-crown' : index === 1 ? 'fas fa-medal' : index === 2 ? 'fas fa-award' : 'fas fa-circle';
+                
+                html += `
+                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg ${isTop ? 'bg-gradient-to-r from-yellow-50 to-orange-50' : ''}">
+                        <div class="flex items-center">
+                            <div class="mr-3">
+                                <i class="${rankIcon} ${isTop ? 'text-yellow-600' : 'text-gray-400'}"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800">${transaction.jenis}</p>
+                                <p class="text-sm text-gray-600">
+                                    <i class="fas fa-map-marker-alt mr-1"></i>
+                                    ${transaction.desa}, ${transaction.kecamatan}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="px-2 py-1 rounded-full ${badgeColor} text-sm font-semibold">
+                                ${transaction.jumlahInt} transaksi
+                            </div>
+                            ${isTop ? '<div class="text-xs text-yellow-600 mt-1">Top Performer</div>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            const totalTransactionsInVillage = sortedTransactions.reduce((sum, transaction) => sum + transaction.jumlahInt, 0);
+            const topTransaction = sortedTransactions[0];
+
+            html += `
+                <div class="mt-4 space-y-3">
+                    <div class="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-l-4 border-purple-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="font-semibold text-purple-800">Total Transaksi</p>
+                                <p class="text-sm text-purple-600">di desa/kelurahan Anda</p>
+                            </div>
+                            <div class="text-2xl font-bold text-purple-700">${totalTransactionsInVillage}</div>
+                        </div>
+                    </div>
+                    ${topTransaction ? `
+                    <div class="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg border border-yellow-200">
+                        <h5 class="font-semibold text-amber-800 mb-1">
+                            <i class="fas fa-star mr-1"></i>
+                            Jenis Usaha Paling Populer
+                        </h5>
+                        <div class="flex items-center justify-between">
+                            <span class="text-amber-700">${topTransaction.jenis}</span>
+                            <span class="font-bold text-amber-800">${topTransaction.jumlahInt} transaksi</span>
+                        </div>
+                        <p class="text-xs text-amber-600 mt-1">Peluang terbesar di lokasi Anda saat ini</p>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            transactionsContainer.innerHTML = html;
         }
 
         function updateStatistics(nearbyData) {
