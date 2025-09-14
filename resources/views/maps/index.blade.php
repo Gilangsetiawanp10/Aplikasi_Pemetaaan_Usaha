@@ -51,10 +51,17 @@
         <!-- Navbar -->
         <nav class="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-center h-20">
+                <div class="flex justify-between items-center h-20">
                     <div class="flex items-center space-x-4">
                         <i class="fas fa-map-marked-alt text-3xl text-white"></i>
                         <h1 class="text-3xl font-bold text-white tracking-wider">Pemetaan Usaha</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="{{ route('maps.potensi') }}" 
+                           class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Analisis Potensi Usaha
+                        </a>
                     </div>
                 </div>
             </div>
