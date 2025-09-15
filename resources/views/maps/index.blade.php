@@ -51,10 +51,17 @@
         <!-- Navbar -->
         <nav class="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-center h-20">
+                <div class="flex justify-between items-center h-20">
                     <div class="flex items-center space-x-4">
                         <i class="fas fa-map-marked-alt text-3xl text-white"></i>
                         <h1 class="text-3xl font-bold text-white tracking-wider">Pemetaan Usaha</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="{{ route('maps.potensi') }}" 
+                           class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Analisis Potensi Usaha
+                        </a>
                     </div>
                 </div>
             </div>
@@ -324,7 +331,12 @@ document.addEventListener('DOMContentLoaded', function() {
             let popupContent = '';
             
             if (type === 'transaction') {
-                const item = transactions[index];
+                // Untuk transaksi, ambil data dari filteredTransactions
+                const item = filteredTransactions[index];
+                if (!item) {
+                    console.error('Transaction item not found at index:', index);
+                    return;
+                }
                 popupContent = `
                     <div class="p-3">
                         <h3 class="font-bold text-purple-600 mb-2">Detail Transaksi</h3>
@@ -394,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
             filteredTransactions.forEach((item, index) => {
                 if (item.coordinates && item.coordinates.length === 2) {
                     const count = parseInt(item.jumlah || 0);
-                    createCountCircle(item.coordinates, count, 'transaction', filteredTransactions.indexOf(item));
+                    createCountCircle(item.coordinates, count, 'transaction', index);
                 }
             });
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ScrapingService;
 use App\Services\GeocodingService;
+use App\Models\Location;
 use Illuminate\Support\Facades\Http;
 
 class MapController extends Controller
@@ -51,6 +52,62 @@ class MapController extends Controller
         }
 
         return view('maps.index', compact('transactions', 'sellers', 'buyers'));
+    }
+
+    public function potensi(ScrapingService $scrapingService)
+    {
+        // Get business data from scraping service
+        $transactions = $scrapingService->getTransaksi();
+        $sellers = $scrapingService->getPenjual();
+        $buyers = $scrapingService->getPembeli();
+
+        // Get location data from database
+        $locations = Location::all()->map(function ($location) {
+            return [
+                'id' => $location->id,
+                'province' => $location->province,
+                'city' => $location->city,
+                'district' => $location->district,
+                'village' => $location->village,
+                'coordinates' => [$location->longitude, $location->latitude],
+                'latitude' => $location->latitude,
+                'longitude' => $location->longitude,
+            ];
+        })->toArray();
+
+        $geo = new GeocodingService();
+        $set_kota = 'Bandung';
+        $set_provinsi = 'Jawa Barat';
+
+        // Add coordinates to business data
+        foreach ($transactions as $i => $transaction) {
+            $transactions[$i]['coordinates'] = $geo->getCoordinates(
+                $transaction['kecamatan'],
+                $transaction['desa'] ?? null,
+                $set_kota,
+                $set_provinsi
+            );
+        }
+
+        foreach ($sellers as $i => $seller) {
+            $sellers[$i]['coordinates'] = $geo->getCoordinates(
+                $seller['kecamatan'],
+                $seller['desa'] ?? null,
+                $set_kota,
+                $set_provinsi
+            );
+        }
+
+        foreach ($buyers as $i => $buyer) {
+            $buyers[$i]['coordinates'] = $geo->getCoordinates(
+                $buyer['kecamatan'],
+                $buyer['desa'] ?? null,
+                $set_kota,
+                $set_provinsi
+            );
+        }
+
+        return view('maps.potensi', compact('locations', 'transactions', 'sellers', 'buyers'));
     }
 
     public function geocodeLocation($name)
