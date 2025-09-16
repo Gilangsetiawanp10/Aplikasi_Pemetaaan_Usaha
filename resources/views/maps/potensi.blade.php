@@ -454,66 +454,98 @@
                         if (item.id.includes('locality') || item.id.includes('neighborhood')) {
                             locationDetails.village = itemText;
                         } else if (item.id.includes('place')) {
-                            // For Indonesian locations, place usually contains district/city info
-                            if (itemText.toLowerCase().includes('kecamatan') || 
-                                (!locationDetails.district && !itemText.toLowerCase().includes('kota') && !itemText.toLowerCase().includes('kabupaten'))) {
+                            // For Indonesian locations, place usually contains specific district (kecamatan)
+                            // The more specific location should be district/kecamatan
+                            if (!locationDetails.district) {
                                 locationDetails.district = itemText;
-                            } else if (itemText.toLowerCase().includes('kota') || itemText.toLowerCase().includes('kabupaten') || !locationDetails.city) {
-                                locationDetails.city = itemText;
                             }
                         } else if (item.id.includes('district')) {
+                            // District in Mapbox is usually more specific (kecamatan level)
                             locationDetails.district = itemText;
                         } else if (item.id.includes('region')) {
                             // Region could be province or city depending on level
                             if (itemText.toLowerCase().includes('jawa') || itemText.toLowerCase().includes('sumatera') || 
                                 itemText.toLowerCase().includes('kalimantan') || itemText.toLowerCase().includes('sulawesi') ||
                                 itemText.toLowerCase().includes('bali') || itemText.toLowerCase().includes('nusa') ||
-                                itemText.toLowerCase().includes('maluku') || itemText.toLowerCase().includes('papua')) {
+                                itemText.toLowerCase().includes('maluku') || itemText.toLowerCase().includes('papua') ||
+                                itemText.toLowerCase().includes('west java') || itemText.toLowerCase().includes('east java') ||
+                                itemText.toLowerCase().includes('central java') || itemText.toLowerCase().includes('jakarta')) {
                                 locationDetails.province = itemText;
-                            } else if (itemText.toLowerCase().includes('kota') || itemText.toLowerCase().includes('kabupaten')) {
+                            } else if (itemText.toLowerCase().includes('kota') || itemText.toLowerCase().includes('kabupaten') ||
+                                     itemText.toLowerCase().includes('bandung') || itemText.toLowerCase().includes('jakarta') ||
+                                     itemText.toLowerCase().includes('surabaya') || itemText.toLowerCase().includes('medan')) {
+                                // This should be the city/regency level
                                 locationDetails.city = itemText;
-                            } else if (!locationDetails.province) {
-                                locationDetails.province = itemText;
                             }
                         } else if (item.id.includes('postcode')) {
                             locationDetails.postalCode = itemText;
                         }
                     });
 
-                    // If we can't get specific details, try to parse from place_name
+                    // Enhanced parsing from place_name if context parsing is insufficient
                     if (!locationDetails.district || !locationDetails.city) {
                         const parts = feature.place_name.split(', ');
+                        
+                        // For address like "Lengkong, Bandung, West Java 40263, Indonesia"
                         if (parts.length >= 2) {
-                            // Try to identify city/regency from the address parts
-                            for (let i = 0; i < parts.length; i++) {
-                                const part = parts[i].trim();
-                                if (part.toLowerCase().includes('kota') || part.toLowerCase().includes('kabupaten')) {
-                                    locationDetails.city = part;
-                                } else if (part.toLowerCase().includes('jawa') && part.toLowerCase().includes('barat')) {
-                                    locationDetails.province = part;
-                                } else if (!locationDetails.district && i === 1) {
-                                    locationDetails.district = part;
-                                } else if (!locationDetails.village && i === 0) {
-                                    locationDetails.village = part;
+                            // First part is usually village/kelurahan
+                            if (!locationDetails.village && parts[0]) {
+                                locationDetails.village = parts[0].trim();
+                            }
+                            
+                            // Second part could be district/kecamatan or city
+                            if (parts[1]) {
+                                const secondPart = parts[1].trim();
+                                // If it's a generic city name like "Bandung", it's likely the city
+                                if (secondPart.toLowerCase() === 'bandung' || 
+                                    secondPart.toLowerCase() === 'jakarta' || 
+                                    secondPart.toLowerCase() === 'surabaya') {
+                                    if (!locationDetails.city) {
+                                        locationDetails.city = `Kota ${secondPart}`;
+                                    }
+                                    // Use the first part as district if it's different from village
+                                    if (!locationDetails.district && locationDetails.village !== parts[0]) {
+                                        locationDetails.district = parts[0].trim();
+                                    }
+                                } else {
+                                    // Otherwise, second part is likely district
+                                    if (!locationDetails.district) {
+                                        locationDetails.district = secondPart;
+                                    }
                                 }
                             }
                             
-                            // Set defaults if still empty
-                            if (!locationDetails.city && parts.length >= 3) {
-                                locationDetails.city = parts[2];
-                            }
-                            if (!locationDetails.province && parts.length >= 4) {
-                                locationDetails.province = parts[3];
+                            // Look for city in later parts
+                            for (let i = 2; i < parts.length; i++) {
+                                const part = parts[i].trim();
+                                if (part.toLowerCase().includes('kota') || 
+                                    part.toLowerCase().includes('kabupaten') ||
+                                    part.toLowerCase().includes('bandung')) {
+                                    if (!locationDetails.city) {
+                                        locationDetails.city = part;
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
 
-                    // Set defaults for Indonesian context if still empty
+                    // Set smart defaults for Indonesian context
                     if (!locationDetails.province) {
-                        locationDetails.province = 'Jawa Barat'; // Default assumption
+                        locationDetails.province = 'Jawa Barat';
                     }
-                    if (!locationDetails.city && locationDetails.province === 'Jawa Barat') {
-                        locationDetails.city = 'Kota Bandung'; // Default assumption
+                    if (!locationDetails.city) {
+                        // Try to infer city from district or use default
+                        if (locationDetails.district && locationDetails.district.toLowerCase().includes('bandung')) {
+                            locationDetails.city = 'Kota Bandung';
+                        } else {
+                            locationDetails.city = 'Kota Bandung';
+                        }
+                    }
+                    
+                    // Fix district if it's too generic
+                    if (locationDetails.district && locationDetails.district.toLowerCase() === 'bandung' && locationDetails.village) {
+                        locationDetails.district = locationDetails.village;
                     }
 
                     // Update UI with location details
@@ -1000,14 +1032,14 @@
 
             if (sellersInSameDistrict.length === 0) {
                 sellersContainer.innerHTML = `
-                    <div class="text-center p-4">
-                        <i class="fas fa-search text-gray-400 text-2xl mb-2"></i>
-                        <p class="text-gray-500 mb-1">Belum ada data penjual terdaftar</p>
-                        <p class="text-sm text-gray-400">di Kecamatan ${userDistrict}</p>
-                        <div class="mt-3 p-2 bg-blue-50 rounded-lg">
+                    <div class="text-center p-6">
+                        <i class="fas fa-search text-gray-400 text-3xl mb-3"></i>
+                        <h4 class="font-semibold text-gray-600 mb-2">Belum Ada Penjual Terdaftar</h4>
+                        <p class="text-sm text-gray-500 mb-4">di Kecamatan ${userDistrict}</p>
+                        <div class="bg-blue-50 rounded-lg p-3">
                             <p class="text-xs text-blue-600">
                                 <i class="fas fa-lightbulb mr-1"></i>
-                                Peluang untuk menjadi pioneer di area ini!
+                                Peluang emas untuk menjadi pioneer di area ini!
                             </p>
                         </div>
                     </div>
@@ -1015,53 +1047,79 @@
                 return;
             }
 
-            let html = `
-                <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                    <h4 class="font-semibold text-blue-800 mb-1">
-                        <i class="fas fa-map-marker-alt mr-1"></i>
-                        Kecamatan ${userDistrict}
-                    </h4>
-                    <p class="text-sm text-blue-600">Ditemukan ${sellersInSameDistrict.length} data penjual</p>
-                </div>
-            `;
-
-            sellersInSameDistrict.forEach(seller => {
-                const sellerCount = parseInt(seller.jumlah_pendaftar_penjual || 0);
-                html += `
-                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                        <div>
-                            <p class="font-medium text-gray-800">${seller.kecamatan}</p>
-                            <p class="text-sm text-gray-600">
-                                <i class="fas fa-store mr-1"></i>
-                                ${sellerCount} penjual terdaftar
-                            </p>
-                        </div>
-                        <div class="text-right">
-                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                                <span class="font-bold text-blue-600">${sellerCount}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
+            // Calculate total sellers
             const totalSellersInDistrict = sellersInSameDistrict.reduce((sum, seller) => 
                 sum + parseInt(seller.jumlah_pendaftar_penjual || 0), 0
             );
 
-            html += `
-                <div class="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="font-semibold text-blue-800">Total Penjual</p>
-                            <p class="text-sm text-blue-600">di kecamatan Anda</p>
+            // Create simplified, clean layout
+            let html = `
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white mb-3">
+                        <span class="text-2xl font-bold">${totalSellersInDistrict}</span>
+                    </div>
+                    <h4 class="text-xl font-bold text-gray-800 mb-1">Penjual Terdaftar</h4>
+                    <p class="text-sm text-gray-600">di Kecamatan ${userDistrict}</p>
+                </div>
+            `;
+
+            // Only show detailed breakdown if there are multiple entries or it's useful
+            if (sellersInSameDistrict.length > 1) {
+                html += `
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <h5 class="font-semibold text-blue-800 mb-3 text-center">
+                            <i class="fas fa-chart-pie mr-2"></i>
+                            Detail Distribusi
+                        </h5>
+                `;
+                
+                sellersInSameDistrict.forEach(seller => {
+                    const sellerCount = parseInt(seller.jumlah_pendaftar_penjual || 0);
+                    const percentage = ((sellerCount / totalSellersInDistrict) * 100).toFixed(1);
+                    
+                    html += `
+                        <div class="flex items-center justify-between py-2">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                <span class="text-sm text-gray-700">${seller.kecamatan}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-sm font-semibold text-blue-700">${sellerCount}</span>
+                                <span class="text-xs text-gray-500 ml-1">(${percentage}%)</span>
+                            </div>
                         </div>
-                        <div class="text-2xl font-bold text-blue-700">${totalSellersInDistrict}</div>
+                    `;
+                });
+                
+                html += `</div>`;
+            }
+
+            // Add insights based on the data
+            html += `
+                <div class="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-blue-200">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-500 mt-1 mr-2"></i>
+                        <div>
+                            <p class="text-sm text-blue-700">
+                                ${getSellersInsight(totalSellersInDistrict, sellersInSameDistrict.length)}
+                            </p>
+                        </div>
                     </div>
                 </div>
             `;
 
             sellersContainer.innerHTML = html;
+        }
+
+        function getSellersInsight(totalSellers, dataPoints) {
+            if (totalSellers > 50) {
+                return `Kompetisi cukup ketat dengan ${totalSellers} penjual terdaftar. Pertimbangkan diferensiasi produk atau layanan untuk bersaing.`;
+            } else if (totalSellers > 20) {
+                return `Persaingan moderat dengan ${totalSellers} penjual. Masih ada ruang untuk bisnis baru dengan strategi yang tepat.`;
+            } else if (totalSellers > 0) {
+                return `Peluang bagus! Hanya ${totalSellers} penjual terdaftar di area ini, masih banyak space untuk berkembang.`;
+            }
+            return 'Area potensial untuk memulai bisnis baru!';
         }
 
         function analyzeBuyersInDistrict(userDistrict) {
@@ -1086,14 +1144,14 @@
 
             if (buyersInSameDistrict.length === 0) {
                 buyersContainer.innerHTML = `
-                    <div class="text-center p-4">
-                        <i class="fas fa-search text-gray-400 text-2xl mb-2"></i>
-                        <p class="text-gray-500 mb-1">Belum ada data pembeli terdaftar</p>
-                        <p class="text-sm text-gray-400">di Kecamatan ${userDistrict}</p>
-                        <div class="mt-3 p-2 bg-green-50 rounded-lg">
+                    <div class="text-center p-6">
+                        <i class="fas fa-search text-gray-400 text-3xl mb-3"></i>
+                        <h4 class="font-semibold text-gray-600 mb-2">Belum Ada Pembeli Terdaftar</h4>
+                        <p class="text-sm text-gray-500 mb-4">di Kecamatan ${userDistrict}</p>
+                        <div class="bg-green-50 rounded-lg p-3">
                             <p class="text-xs text-green-600">
                                 <i class="fas fa-lightbulb mr-1"></i>
-                                Potensi untuk mengembangkan basis pelanggan baru!
+                                Peluang emas untuk mengembangkan basis pelanggan baru!
                             </p>
                         </div>
                     </div>
@@ -1101,53 +1159,81 @@
                 return;
             }
 
-            let html = `
-                <div class="mb-4 p-3 bg-green-50 rounded-lg">
-                    <h4 class="font-semibold text-green-800 mb-1">
-                        <i class="fas fa-map-marker-alt mr-1"></i>
-                        Kecamatan ${userDistrict}
-                    </h4>
-                    <p class="text-sm text-green-600">Ditemukan ${buyersInSameDistrict.length} data pembeli</p>
-                </div>
-            `;
-
-            buyersInSameDistrict.forEach(buyer => {
-                const buyerCount = parseInt(buyer.jumlah_pendaftar_pembeli || 0);
-                html += `
-                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                        <div>
-                            <p class="font-medium text-gray-800">${buyer.kecamatan}</p>
-                            <p class="text-sm text-gray-600">
-                                <i class="fas fa-users mr-1"></i>
-                                ${buyerCount} pembeli terdaftar
-                            </p>
-                        </div>
-                        <div class="text-right">
-                            <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                                <span class="font-bold text-green-600">${buyerCount}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
+            // Calculate total buyers
             const totalBuyersInDistrict = buyersInSameDistrict.reduce((sum, buyer) => 
                 sum + parseInt(buyer.jumlah_pendaftar_pembeli || 0), 0
             );
 
-            html += `
-                <div class="mt-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-l-4 border-green-500">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="font-semibold text-green-800">Total Pembeli</p>
-                            <p class="text-sm text-green-600">di kecamatan Anda</p>
+            // Create simplified, clean layout
+            let html = `
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white mb-3">
+                        <span class="text-2xl font-bold">${totalBuyersInDistrict}</span>
+                    </div>
+                    <h4 class="text-xl font-bold text-gray-800 mb-1">Pembeli Potensial</h4>
+                    <p class="text-sm text-gray-600">di Kecamatan ${userDistrict}</p>
+                </div>
+            `;
+
+            // Only show detailed breakdown if there are multiple entries or it's useful
+            if (buyersInSameDistrict.length > 1) {
+                html += `
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <h5 class="font-semibold text-green-800 mb-3 text-center">
+                            <i class="fas fa-chart-pie mr-2"></i>
+                            Detail Distribusi
+                        </h5>
+                `;
+                
+                buyersInSameDistrict.forEach(buyer => {
+                    const buyerCount = parseInt(buyer.jumlah_pendaftar_pembeli || 0);
+                    const percentage = ((buyerCount / totalBuyersInDistrict) * 100).toFixed(1);
+                    
+                    html += `
+                        <div class="flex items-center justify-between py-2">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                                <span class="text-sm text-gray-700">${buyer.kecamatan}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-sm font-semibold text-green-700">${buyerCount}</span>
+                                <span class="text-xs text-gray-500 ml-1">(${percentage}%)</span>
+                            </div>
                         </div>
-                        <div class="text-2xl font-bold text-green-700">${totalBuyersInDistrict}</div>
+                    `;
+                });
+                
+                html += `</div>`;
+            }
+
+            // Add insights based on the data
+            html += `
+                <div class="mt-4 p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-green-200">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-green-500 mt-1 mr-2"></i>
+                        <div>
+                            <p class="text-sm text-green-700">
+                                ${getBuyersInsight(totalBuyersInDistrict, buyersInSameDistrict.length)}
+                            </p>
+                        </div>
                     </div>
                 </div>
             `;
 
             buyersContainer.innerHTML = html;
+        }
+
+        function getBuyersInsight(totalBuyers, dataPoints) {
+            if (totalBuyers > 100) {
+                return `Pasar yang menjanjikan! ${totalBuyers} pembeli potensial terdaftar di area ini menunjukkan demand yang tinggi.`;
+            } else if (totalBuyers > 50) {
+                return `Market size yang solid dengan ${totalBuyers} pembeli potensial. Peluang bagus untuk berbagai jenis bisnis.`;
+            } else if (totalBuyers > 20) {
+                return `Base pelanggan yang moderate dengan ${totalBuyers} pembeli. Cocok untuk bisnis dengan target market spesifik.`;
+            } else if (totalBuyers > 0) {
+                return `${totalBuyers} pembeli terdaftar di area ini. Fokus pada strategi customer acquisition yang tepat sasaran.`;
+            }
+            return 'Potensi untuk membangun customer base dari nol!';
         }
 
         function analyzeTransactionsInVillage(userVillage) {

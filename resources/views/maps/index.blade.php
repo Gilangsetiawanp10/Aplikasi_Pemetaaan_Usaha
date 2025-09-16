@@ -331,12 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let popupContent = '';
             
             if (type === 'transaction') {
-                // Untuk transaksi, ambil data dari filteredTransactions
-                const item = filteredTransactions[index];
-                if (!item) {
-                    console.error('Transaction item not found at index:', index);
-                    return;
-                }
+                const item = transactions[index];
                 popupContent = `
                     <div class="p-3">
                         <h3 class="font-bold text-purple-600 mb-2">Detail Transaksi</h3>
@@ -406,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
             filteredTransactions.forEach((item, index) => {
                 if (item.coordinates && item.coordinates.length === 2) {
                     const count = parseInt(item.jumlah || 0);
-                    createCountCircle(item.coordinates, count, 'transaction', index);
+                    createCountCircle(item.coordinates, count, 'transaction', filteredTransactions.indexOf(item));
                 }
             });
         }
